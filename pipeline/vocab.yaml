@@ -1,0 +1,79 @@
+# 方法論詞彙表 v0.1（POC 用，之後會隨全庫擴充）
+# - id：英文 kebab-case，卡片裡只能用這些 id
+# - zh：簡體中文名稱（和研報原文一致，方便 grep）
+# - aliases：同義詞 / 英文 / 繁體，供檢索擴展用
+# 卡片裡 methods 欄位只能填這裡的 id；詞彙表沒有的方法寫進 new_tag_suggestions
+
+families:
+  factor-construction:     {zh: 因子构建, aliases: [因子挖掘, alpha因子, factor construction]}
+  factor-preprocessing:    {zh: 因子预处理, aliases: [数据处理, 因子清洗, data preprocessing]}
+  factor-testing:          {zh: 因子检验, aliases: [因子评价, 因子回测, 单因子测试, factor testing]}
+  risk-model:              {zh: 风险模型, aliases: [风险预测, 协方差估计, risk model]}
+  portfolio-construction:  {zh: 组合构建与优化, aliases: [组合优化, 指数增强, portfolio optimization]}
+  market-timing:           {zh: 择时, aliases: [市场择时, 仓位管理, timing]}
+  trend-following:         {zh: 趋势跟踪与CTA, aliases: [CTA, 期货趋势, trend following]}
+  machine-learning:        {zh: 机器学习, aliases: [深度学习, 人工智能, AI, ML]}
+  asset-allocation:        {zh: 资产配置, aliases: [大类资产, 宏观配置, asset allocation]}
+  alternative-data:        {zh: 另类数据, aliases: [文本数据, 舆情, alternative data]}
+  fund-flow-and-holdings:  {zh: 资金流与持仓, aliases: [北向资金, 外资持股, 机构持仓, fund flow]}
+  fund-analysis:           {zh: 基金与量化产品分析, aliases: [基金评价, 产品分析, fund analysis]}
+  index-operations:        {zh: 指数运作, aliases: [指数调样, 成分股调整, index rebalancing]}
+  market-commentary:       {zh: 市场观点与周报, aliases: [量化观市, 周报, 市场点评, market commentary]}
+  behavioral-and-microstructure: {zh: 行为金融与市场微观结构, aliases: [投资者行为, 微观结构, behavioral finance]}
+  derivatives-strategy:    {zh: 衍生品策略, aliases: [期权, 股指期货, 套利, derivatives]}
+
+methods:
+  # 因子：风格与 alpha
+  momentum:                {zh: 动量, family: factor-construction, aliases: [momentum, 動量]}
+  idiosyncratic-momentum:  {zh: 特质动量, family: factor-construction, aliases: [残差动量, residual momentum, idiosyncratic momentum]}
+  reversal:                {zh: 反转, family: factor-construction, aliases: [短期反转, reversal]}
+  size:                    {zh: 规模, family: factor-construction, aliases: [市值因子, size]}
+  nonlinear-size:          {zh: 非线性规模, family: factor-construction, aliases: [中市值, nonlinear size]}
+  value:                   {zh: 价值, family: factor-construction, aliases: [估值, value]}
+  growth:                  {zh: 成长, family: factor-construction, aliases: [growth]}
+  quality:                 {zh: 质量, family: factor-construction, aliases: [盈利质量, quality]}
+  beta:                    {zh: Beta, family: factor-construction, aliases: [低beta, 贝塔, low beta]}
+  volatility:              {zh: 波动率, family: factor-construction, aliases: [低波动, 特质波动率, volatility]}
+  liquidity:               {zh: 流动性, family: factor-construction, aliases: [换手率, liquidity, turnover]}
+  industry-factor:         {zh: 行业因子, family: factor-construction, aliases: [纯行业因子, 行业分类, industry factor]}
+  analyst-expectation:     {zh: 分析师预期, family: factor-construction, aliases: [一致预期, analyst]}
+  fundamental-factor:      {zh: 基本面因子, family: factor-construction, aliases: [财务因子, fundamental]}
+  price-volume-factor:     {zh: 量价因子, family: factor-construction, aliases: [技术因子, price volume]}
+  # 预处理
+  outlier-treatment:       {zh: 去极值, family: factor-preprocessing, aliases: [异常值处理, winsorize, MAD]}
+  standardization:         {zh: 标准化, family: factor-preprocessing, aliases: [z-score, 排序标准化, standardization]}
+  neutralization:          {zh: 中性化, family: factor-preprocessing, aliases: [行业市值中性, neutralization]}
+  missing-value-imputation: {zh: 缺失值处理, family: factor-preprocessing, aliases: [缺失值填充, imputation]}
+  # 检验与回归
+  ic-analysis:             {zh: IC分析, family: factor-testing, aliases: [IC, ICIR, Rank IC, information coefficient]}
+  quantile-backtest:       {zh: 分层回测, family: factor-testing, aliases: [分组回测, 多空组合, quantile portfolio]}
+  cross-sectional-regression: {zh: 横截面回归, family: factor-testing, aliases: [Fama-MacBeth, cross-sectional regression]}
+  time-series-regression:  {zh: 时间序列回归, family: factor-testing, aliases: [时序回归, time-series regression]}
+  r-squared-interpretation: {zh: R方解读, family: factor-testing, aliases: [拟合优度, R2, R-squared]}
+  style-attribution:       {zh: 风格归因, family: factor-testing, aliases: [业绩归因, 风格暴露, attribution]}
+  # 风险与组合
+  factor-risk-model:       {zh: 多因子风险模型, family: risk-model, aliases: [Barra, 结构化风险模型, factor risk model]}
+  covariance-estimation:   {zh: 协方差矩阵估计, family: risk-model, aliases: [Newey-West, 特征值调整, 波动率偏误调整, covariance]}
+  specific-risk:           {zh: 特质风险, family: risk-model, aliases: [特异风险, specific risk]}
+  index-enhancement:       {zh: 指数增强, family: portfolio-construction, aliases: [增强组合, enhanced index]}
+  mean-variance-optimization: {zh: 均值方差优化, family: portfolio-construction, aliases: [组合优化, MVO]}
+  index-replication:       {zh: 指数复制, family: index-operations, aliases: [权重复刻, 成分股权重, index replication]}
+  index-rebalance-prediction: {zh: 指数调样预测, family: index-operations, aliases: [成分股调整, rebalance]}
+  dividend-point-estimation: {zh: 分红点位测算, family: index-operations, aliases: [股指期货分红, dividend]}
+  # 机器学习
+  tree-models:             {zh: 树模型, family: machine-learning, aliases: [GBDT, XGBoost, LightGBM, 随机森林]}
+  neural-networks:         {zh: 神经网络, family: machine-learning, aliases: [深度学习, LSTM, GRU, Transformer, MLP]}
+  ml-factor-mining:        {zh: 机器学习因子, family: machine-learning, aliases: [AI因子, ML alpha]}
+  change-point-detection:  {zh: 变点识别, family: machine-learning, aliases: [结构突变, change point]}
+  agent-based-simulation:  {zh: 多主体模拟, family: behavioral-and-microstructure, aliases: [投资者模拟, agent-based model]}
+  investor-disagreement:   {zh: 投资者分歧, family: behavioral-and-microstructure, aliases: [意见分歧, disagreement]}
+  # 择时、CTA、宏观
+  trend-signal:            {zh: 趋势信号, family: trend-following, aliases: [均线, 突破, trend signal]}
+  chaos-fractal:           {zh: 混沌与分形, family: trend-following, aliases: [混沌理论, 分形, Hurst, chaos theory]}
+  noise-filtering:         {zh: 噪声过滤, family: trend-following, aliases: [噪声交易, 去噪, noise]}
+  index-futures:           {zh: 股指期货, family: derivatives-strategy, aliases: [IF, IC, IH, IM, index futures]}
+  macro-indicators:        {zh: 宏观指标, family: asset-allocation, aliases: [社融, 经济周期, macro]}
+  market-sentiment:        {zh: 市场情绪, family: market-timing, aliases: [情绪指标, sentiment]}
+  northbound-flow:         {zh: 外资与北向资金, family: fund-flow-and-holdings, aliases: [陆股通, 外资持股, QFII, northbound]}
+  smart-money:             {zh: 聪明钱, family: fund-flow-and-holdings, aliases: [smart money]}
+  fund-style-analysis:     {zh: 基金风格分析, family: fund-analysis, aliases: [产品风格, 量化产品]}
