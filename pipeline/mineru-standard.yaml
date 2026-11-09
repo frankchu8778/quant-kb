@@ -1,0 +1,6 @@
+# MinerU standard 等級專用設定：VLM 改連本機 vLLM（serve_mineru_vlm.sh，port 8001），不上傳任何資料
+# 用法：MINERU_CONFIG=pipeline/mineru-standard.yaml python convert.py --tier standard
+model:
+  vlm:
+    server_url: http://localhost:8001/v1
+    model: mineru-vlm
