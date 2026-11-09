@@ -1,7 +1,7 @@
 {
   "fulltext/poc/basic": {
     "summary_mean": {
-      "chars": 25876.35,
+      "chars": 25905.85,
       "cjk_chars": 9666.05,
       "garbled_pct": 0.0,
       "display_formulas": 7.7,
@@ -114,7 +114,7 @@
         "headings": 23
       },
       "20190702_财通证券_8a9283": {
-        "chars": 32604,
+        "chars": 32606,
         "cjk_chars": 12284,
         "garbled_pct": 0.0,
         "display_formulas": 17,
@@ -169,7 +169,7 @@
         "headings": 22
       },
       "20240429_国金证券_769662": {
-        "chars": 24551,
+        "chars": 24701,
         "cjk_chars": 8419,
         "garbled_pct": 0.0,
         "display_formulas": 1,
@@ -180,7 +180,7 @@
         "headings": 21
       },
       "20240506_国金证券_b61ef7": {
-        "chars": 25097,
+        "chars": 25271,
         "cjk_chars": 9041,
         "garbled_pct": 0.0,
         "display_formulas": 1,
@@ -191,7 +191,7 @@
         "headings": 21
       },
       "20240512_国金证券_35a947": {
-        "chars": 23194,
+        "chars": 23276,
         "cjk_chars": 7769,
         "garbled_pct": 0.0,
         "display_formulas": 1,
@@ -202,7 +202,7 @@
         "headings": 21
       },
       "20240526_国金证券_e392a7": {
-        "chars": 24223,
+        "chars": 24403,
         "cjk_chars": 7557,
         "garbled_pct": 0.0,
         "display_formulas": 1,
@@ -224,13 +224,250 @@
         "headings": 47
       },
       "nodate_unknown_9dbd98": {
-        "chars": 20453,
+        "chars": 20455,
         "cjk_chars": 7033,
         "garbled_pct": 0.0,
         "display_formulas": 25,
         "inline_formulas": 48,
         "html_tables": 1,
         "md_table_rows": 100,
+        "images": 5,
+        "headings": 22
+      }
+    }
+  },
+  "fulltext/poc/standard": {
+    "summary_mean": {
+      "chars": 24723.5,
+      "cjk_chars": 9670.5,
+      "garbled_pct": 0.0,
+      "display_formulas": 7.7,
+      "inline_formulas": 20.85,
+      "html_tables": 2.8,
+      "md_table_rows": 51.3,
+      "images": 19.4,
+      "headings": 28.55,
+      "files": 20,
+      "files_garbled_over_0.5pct": []
+    },
+    "per_file": {
+      "20190224_财通证券_ff5e56": {
+        "chars": 27224,
+        "cjk_chars": 8699,
+        "garbled_pct": 0.0,
+        "display_formulas": 15,
+        "inline_formulas": 63,
+        "html_tables": 3,
+        "md_table_rows": 10,
+        "images": 13,
+        "headings": 28
+      },
+      "20190303_财通证券_763a46": {
+        "chars": 25453,
+        "cjk_chars": 8765,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 0,
+        "html_tables": 4,
+        "md_table_rows": 79,
+        "images": 10,
+        "headings": 29
+      },
+      "20190317_财通证券_447d35": {
+        "chars": 30348,
+        "cjk_chars": 11051,
+        "garbled_pct": 0.0,
+        "display_formulas": 12,
+        "inline_formulas": 40,
+        "html_tables": 3,
+        "md_table_rows": 13,
+        "images": 39,
+        "headings": 45
+      },
+      "20190324_财通证券_53adb9": {
+        "chars": 24076,
+        "cjk_chars": 8505,
+        "garbled_pct": 0.0,
+        "display_formulas": 3,
+        "inline_formulas": 4,
+        "html_tables": 3,
+        "md_table_rows": 34,
+        "images": 15,
+        "headings": 27
+      },
+      "20190409_财通证券_94d3f3": {
+        "chars": 24822,
+        "cjk_chars": 10643,
+        "garbled_pct": 0.0,
+        "display_formulas": 4,
+        "inline_formulas": 0,
+        "html_tables": 3,
+        "md_table_rows": 56,
+        "images": 25,
+        "headings": 28
+      },
+      "20190416_财通证券_6c5dfa": {
+        "chars": 29562,
+        "cjk_chars": 10877,
+        "garbled_pct": 0.0,
+        "display_formulas": 2,
+        "inline_formulas": 1,
+        "html_tables": 4,
+        "md_table_rows": 20,
+        "images": 25,
+        "headings": 27
+      },
+      "20190423_财通证券_1e79c0": {
+        "chars": 34590,
+        "cjk_chars": 11369,
+        "garbled_pct": 0.0,
+        "display_formulas": 7,
+        "inline_formulas": 7,
+        "html_tables": 4,
+        "md_table_rows": 51,
+        "images": 16,
+        "headings": 30
+      },
+      "20190507_财通证券_6dfdbf": {
+        "chars": 38245,
+        "cjk_chars": 15196,
+        "garbled_pct": 0.0,
+        "display_formulas": 45,
+        "inline_formulas": 114,
+        "html_tables": 2,
+        "md_table_rows": 7,
+        "images": 23,
+        "headings": 33
+      },
+      "20190619_财通证券_3bd8a5": {
+        "chars": 14234,
+        "cjk_chars": 6545,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 0,
+        "html_tables": 4,
+        "md_table_rows": 42,
+        "images": 4,
+        "headings": 23
+      },
+      "20190702_财通证券_8a9283": {
+        "chars": 32489,
+        "cjk_chars": 12284,
+        "garbled_pct": 0.0,
+        "display_formulas": 17,
+        "inline_formulas": 2,
+        "html_tables": 3,
+        "md_table_rows": 34,
+        "images": 20,
+        "headings": 30
+      },
+      "20190716_财通证券_146278": {
+        "chars": 26842,
+        "cjk_chars": 10646,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 0,
+        "html_tables": 2,
+        "md_table_rows": 34,
+        "images": 22,
+        "headings": 31
+      },
+      "20191029_财通证券_e9da28": {
+        "chars": 18569,
+        "cjk_chars": 10374,
+        "garbled_pct": 0.0,
+        "display_formulas": 6,
+        "inline_formulas": 25,
+        "html_tables": 1,
+        "md_table_rows": 31,
+        "images": 11,
+        "headings": 28
+      },
+      "20240412_浙商证券_2c09a4": {
+        "chars": 12317,
+        "cjk_chars": 6742,
+        "garbled_pct": 0.0,
+        "display_formulas": 7,
+        "inline_formulas": 8,
+        "html_tables": 0,
+        "md_table_rows": 58,
+        "images": 16,
+        "headings": 37
+      },
+      "20240416_招商证券_b64476": {
+        "chars": 26632,
+        "cjk_chars": 10064,
+        "garbled_pct": 0.0,
+        "display_formulas": 4,
+        "inline_formulas": 25,
+        "html_tables": 1,
+        "md_table_rows": 169,
+        "images": 25,
+        "headings": 22
+      },
+      "20240429_国金证券_769662": {
+        "chars": 21240,
+        "cjk_chars": 8414,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 20,
+        "html_tables": 4,
+        "md_table_rows": 59,
+        "images": 23,
+        "headings": 21
+      },
+      "20240506_国金证券_b61ef7": {
+        "chars": 22028,
+        "cjk_chars": 9051,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 13,
+        "html_tables": 4,
+        "md_table_rows": 59,
+        "images": 23,
+        "headings": 21
+      },
+      "20240512_国金证券_35a947": {
+        "chars": 20719,
+        "cjk_chars": 7774,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 29,
+        "html_tables": 4,
+        "md_table_rows": 59,
+        "images": 22,
+        "headings": 21
+      },
+      "20240526_国金证券_e392a7": {
+        "chars": 21232,
+        "cjk_chars": 7567,
+        "garbled_pct": 0.0,
+        "display_formulas": 1,
+        "inline_formulas": 23,
+        "html_tables": 5,
+        "md_table_rows": 59,
+        "images": 22,
+        "headings": 21
+      },
+      "20240615_华泰证券_5a7a4f": {
+        "chars": 23192,
+        "cjk_chars": 11811,
+        "garbled_pct": 0.0,
+        "display_formulas": 0,
+        "inline_formulas": 0,
+        "html_tables": 1,
+        "md_table_rows": 69,
+        "images": 29,
+        "headings": 47
+      },
+      "nodate_unknown_9dbd98": {
+        "chars": 20656,
+        "cjk_chars": 7033,
+        "garbled_pct": 0.0,
+        "display_formulas": 25,
+        "inline_formulas": 43,
+        "html_tables": 1,
+        "md_table_rows": 83,
         "images": 5,
         "headings": 22
       }

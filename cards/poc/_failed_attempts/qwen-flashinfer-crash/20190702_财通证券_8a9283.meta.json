@@ -1,0 +1,7 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20190702_财通证券_8a9283.md",
+  "prompt_chars": 35491,
+  "error": "APIConnectionError: Connection error.",
+  "seconds": 2.2
+}
