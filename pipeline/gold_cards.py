@@ -36,6 +36,7 @@ def main():
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--wait", type=int, default=900, help="撞到額度限制時等待秒數")
     ap.add_argument("--max-waits", type=int, default=24)
+    ap.add_argument("--prompt", default="card_prompt.md", help="prompt 範本檔（pipeline/ 下）")
     ap.add_argument("--only", nargs="*", help="只處理這些 id")
     args = ap.parse_args()
 
@@ -51,7 +52,7 @@ def main():
         if (out / f"{rid}.json").exists():
             print(f"skip  {rid}", flush=True)
             continue
-        prompt = build_prompt(vocab, rid, md.read_text())
+        prompt = build_prompt(vocab, rid, md.read_text(), args.prompt)
         while True:
             t0 = time.time()
             res, err = run_claude(prompt, args.model)

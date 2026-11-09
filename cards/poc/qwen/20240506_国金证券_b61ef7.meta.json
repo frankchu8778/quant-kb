@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20240506_国金证券_b61ef7.md",
+  "prompt_chars": 27665,
+  "usage": {
+    "input_tokens": 15248,
+    "output_tokens": 1560
+  },
+  "seconds": 130.3,
+  "validation_errors": []
+}

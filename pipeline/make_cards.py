@@ -23,7 +23,7 @@ def call_qwen(prompt, schema, args):
     r = client.chat.completions.create(
         model="qwen-local",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.2, max_tokens=6000,
+        temperature=0.2, max_tokens=16000 if args.thinking else 6000,  # thinking 也算在輸出 token 內
         response_format={"type": "json_schema",
                          "json_schema": {"name": "card", "schema": schema, "strict": True}},
         extra_body={"chat_template_kwargs": {"enable_thinking": args.thinking}},
@@ -54,7 +54,7 @@ def process(md: Path, out: Path, vocab, schema, args):
     card_path = out / f"{rid}.json"
     if card_path.exists():
         return rid, "skip"
-    prompt = build_prompt(vocab, rid, md.read_text())
+    prompt = build_prompt(vocab, rid, md.read_text(), args.prompt)
     meta = {"engine": args.engine, "src": str(md.relative_to(KB)), "prompt_chars": len(prompt)}
     t0 = time.time()
     try:
@@ -80,6 +80,7 @@ def main():
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--thinking", action="store_true", help="Qwen 開啟 thinking 模式")
     ap.add_argument("--thinking-budget", type=int, default=8000, help="MiniMax thinking token 上限")
+    ap.add_argument("--prompt", default="card_prompt.md", help="prompt 範本檔（pipeline/ 下）")
     ap.add_argument("--only", nargs="*", help="只處理這些 id")
     args = ap.parse_args()
 

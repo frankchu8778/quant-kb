@@ -69,11 +69,11 @@ def card_schema(vocab):
     return obj(props)
 
 
-def build_prompt(vocab, filename, fulltext):
+def build_prompt(vocab, filename, fulltext, template="card_prompt.md"):
     fams = "\n".join(f"- `{k}`：{v['zh']}" for k, v in vocab["families"].items())
     meths = "\n".join(f"- `{k}`：{v['zh']}（{v['family']}；{'、'.join(map(str, v['aliases']))}）"
                       for k, v in vocab["methods"].items())
-    tpl = (PIPELINE / "card_prompt.md").read_text()
+    tpl = (PIPELINE / template).read_text()
     return (tpl.replace("{families}", fams).replace("{methods}", meths)
                .replace("{filename}", filename).replace("{fulltext}", fulltext))
 

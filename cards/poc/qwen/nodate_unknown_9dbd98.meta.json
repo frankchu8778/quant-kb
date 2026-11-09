@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/nodate_unknown_9dbd98.md",
+  "prompt_chars": 25179,
+  "usage": {
+    "input_tokens": 13972,
+    "output_tokens": 1901
+  },
+  "seconds": 163.7,
+  "validation_errors": []
+}

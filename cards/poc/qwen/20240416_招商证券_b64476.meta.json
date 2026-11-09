@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20240416_招商证券_b64476.md",
+  "prompt_chars": 29766,
+  "usage": {
+    "input_tokens": 17924,
+    "output_tokens": 1972
+  },
+  "seconds": 168.4,
+  "validation_errors": []
+}
