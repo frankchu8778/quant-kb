@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20190317_财通证券_447d35.md",
+  "prompt_chars": 34298,
+  "usage": {
+    "input_tokens": 19587,
+    "output_tokens": 1149
+  },
+  "seconds": 99.7,
+  "validation_errors": []
+}

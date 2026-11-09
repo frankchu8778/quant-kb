@@ -1,0 +1,87 @@
+{
+  "title": "数据异常值处理:比较与实践",
+  "broker": "财通证券",
+  "date": "2019-03-17",
+  "series": "“拾穗”多因子系列",
+  "report_type": "系列专题",
+  "value_level": "high",
+  "value_reason": "系统比较了7种异常值处理方法，并通过实证给出了针对财务因子和价量因子的最佳实践建议，对因子预处理有直接指导意义。",
+  "primary_family": "factor-preprocessing",
+  "families": [
+    "factor-preprocessing",
+    "factor-testing",
+    "factor-construction"
+  ],
+  "methods": [
+    "outlier-treatment",
+    "standardization",
+    "cross-sectional-regression",
+    "factor-risk-model"
+  ],
+  "new_tag_suggestions": [
+    "分位数回归",
+    "财务因子异常值",
+    "价量因子异常值"
+  ],
+  "data_needed": [
+    "日频行情",
+    "财务报表",
+    "指数成分权重"
+  ],
+  "summary": "本文对比了均值标准差修正、中位数去极值、箱形图等7种异常值处理方法。实证表明，中位数去极值法和箱形图法在处理财务和价量数据时更为稳健。此外，分位数回归比OLS更能抵抗极端值影响。",
+  "core_idea": "财务类因子（特别是增长率）比价量因子更容易出现极端异常值，传统的基于均值和标准差的方法（如3σ法）在极端值存在时会失效，推荐使用基于中位数或四分位数的稳健方法（如MAD、箱形图）。",
+  "method_steps": [
+    "识别异常值：使用MAD或箱形图法确定上下界。",
+    "处理异常值：将超出上下界的因子值拉回至边界值。",
+    "对比验证：计算处理前后的相关系数或回归系数，评估稳健性。",
+    "回归分析：使用分位数回归替代OLS，以全面描述条件分布。"
+  ],
+  "key_formulas": [
+    {
+      "latex": "$\\tilde{x}_{i} = \\begin{cases} \\mu + 3\\sigma, & x_i > \\mu + 3\\sigma \\\\ \\mu - 3\\sigma, & x_i < \\mu - 3\\sigma \\\\ x_i, & \\text{else} \\end{cases}$",
+      "meaning": "均值标准差修正法（3σ法）"
+    },
+    {
+      "latex": "$\\tilde{M}AD = median_{i}(|x_{i} - median(x)|)$",
+      "meaning": "中位数绝对偏差（MAD）"
+    },
+    {
+      "latex": "$Risk(P) = W'VW = W'(X'FX + \\Delta)W$",
+      "meaning": "组合风险预测公式"
+    }
+  ],
+  "key_results": [
+    {
+      "metric": "相关系数提升",
+      "value": "从0.0025提升至0.3369",
+      "context": "中位数去极值法处理后，净利润同比增长率与营业收入同比增长率的相关性显著增强",
+      "quote": "经计算二者相关系数仅为0.0025...经过中位数去极值法...处理异常值后数据呈现的相关关系更加明显"
+    },
+    {
+      "metric": "波动率预测区间",
+      "value": "21%-31%",
+      "context": "样本指数未来一个月的年化波动率预测",
+      "quote": "所有样本指数在未来一个月的年化波动区间在 21%-31%之间"
+    }
+  ],
+  "limitations": [
+    "[推断] 报告未提供处理后的因子在实盘策略中的具体收益表现，仅通过相关性分析验证有效性。",
+    "[推断] 分位数回归部分仅为概念性介绍，未提供在A股因子检验中的具体实证结果。"
+  ],
+  "reproducibility": "high",
+  "reproducibility_reason": "文中详细列出了7种异常值处理方法的数学定义、公式及适用场景，并提供了实证对比结果，复现门槛低。",
+  "evidence_quotes": [
+    {
+      "claim": "财务因子比价量因子更容易出现异常值",
+      "quote": "相较于价量因子,财务数据特别是增长率类数据所含的异常值更多。"
+    },
+    {
+      "claim": "MAD和箱形图法更稳健",
+      "quote": "经实证检验,对于各类数据而言,中位数去极值法和箱形图法是更为稳健的方法。"
+    },
+    {
+      "claim": "分位数回归优于OLS",
+      "quote": "相较于传统的 OLS 回归法,基于分位数回归的方法更不容易受极端值影响,且能够更为全面地描述被解释变量条件分布的全貌。"
+    }
+  ]
+}

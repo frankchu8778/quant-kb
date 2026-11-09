@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20190303_财通证券_763a46.md",
+  "prompt_chars": 28819,
+  "usage": {
+    "input_tokens": 17005,
+    "output_tokens": 1310
+  },
+  "seconds": 111.3,
+  "validation_errors": []
+}

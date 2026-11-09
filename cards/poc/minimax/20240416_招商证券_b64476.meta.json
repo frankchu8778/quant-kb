@@ -1,0 +1,21 @@
+{
+  "engine": "minimax",
+  "src": "fulltext/poc/clean-v2/20240416_招商证券_b64476.md",
+  "prompt_chars": 29766,
+  "usage": {
+    "cache_creation": null,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 198,
+    "inference_geo": null,
+    "input_tokens": 15723,
+    "output_tokens": 14804,
+    "output_tokens_details": {
+      "thinking_tokens": 12092
+    },
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": null
+  },
+  "seconds": 80.1,
+  "validation_errors": []
+}

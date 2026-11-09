@@ -1,0 +1,21 @@
+{
+  "engine": "minimax",
+  "src": "fulltext/poc/clean-v2/20240615_华泰证券_5a7a4f.md",
+  "prompt_chars": 26090,
+  "usage": {
+    "cache_creation": null,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 197,
+    "inference_geo": null,
+    "input_tokens": 12256,
+    "output_tokens": 13709,
+    "output_tokens_details": {
+      "thinking_tokens": 11870
+    },
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": null
+  },
+  "seconds": 82.9,
+  "validation_errors": []
+}

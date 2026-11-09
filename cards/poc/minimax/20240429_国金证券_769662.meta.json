@@ -1,0 +1,21 @@
+{
+  "engine": "minimax",
+  "src": "fulltext/poc/clean-v2/20240429_国金证券_769662.md",
+  "prompt_chars": 27136,
+  "usage": {
+    "cache_creation": null,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 197,
+    "inference_geo": null,
+    "input_tokens": 13653,
+    "output_tokens": 13961,
+    "output_tokens_details": {
+      "thinking_tokens": 11807
+    },
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": null
+  },
+  "seconds": 78.4,
+  "validation_errors": []
+}
