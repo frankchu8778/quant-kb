@@ -1,0 +1,63 @@
+{
+  "engine": "claude-sonnet",
+  "src": "fulltext/poc/clean-v2/20190409_财通证券_94d3f3.md",
+  "prompt_chars": 30560,
+  "seconds": 20.2,
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 23538,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 2579,
+    "output_tokens_details": {
+      "thinking_tokens": 0
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 23538,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 2579,
+        "cache_read_input_tokens": 0,
+        "cache_creation_input_tokens": 23538,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 23538
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "total_cost_usd_api_equiv": 0.119946,
+  "model_usage": {
+    "claude-sonnet-5-5": {
+      "inputTokens": 2,
+      "outputTokens": 2579,
+      "cacheReadInputTokens": 0,
+      "cacheCreationInputTokens": 23538,
+      "webSearchRequests": 0,
+      "costUSD": 0.119946,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 0,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 23538,
+      "canonicalModel": "claude-sonnet-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  },
+  "is_error": false,
+  "validation_errors": [
+    "family 不在詞彙表: style-attribution-placeholder-removed"
+  ]
+}

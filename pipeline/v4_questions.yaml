@@ -1,0 +1,65 @@
+# V4 端到端檢索測試題（POC 20 篇）
+# must：應該找到的研報（算召回率）；ok：找到也算合理（不算誤報）
+# 標準答案依全文判斷「實質相關」（主題或有獨立章節/實證），不是「有提到這個詞」
+# lang：simplified / traditional / english，用來比較不同提問語言的召回率
+
+- id: q1
+  lang: traditional
+  q: 哪些研報在研究動量因子，或是動量因子的改進版本（例如剔除風格暴露後的動量）？
+  must: [20190702_财通证券_8a9283]
+  ok: [20191029_财通证券_e9da28, 20190716_财通证券_146278]
+
+- id: q2
+  lang: english
+  q: Which reports apply machine learning to factor construction or stock selection?
+  must: [20240416_招商证券_b64476, 20240615_华泰证券_5a7a4f]
+  ok: [20240412_浙商证券_2c09a4]
+
+- id: q3
+  lang: traditional
+  q: 做因子資料清洗時，缺失值和極端值應該怎麼處理？有沒有比較過不同方法？
+  must: [20190317_财通证券_447d35, 20190324_财通证券_53adb9]
+  ok: []
+
+- id: q4
+  lang: simplified
+  q: 横截面回归和时间序列回归有什么区别？什么时候该用哪一种？
+  must: [20191029_财通证券_e9da28]
+  ok: [20190702_财通证券_8a9283, 20190224_财通证券_ff5e56]
+
+- id: q5
+  lang: english
+  q: How should I estimate the factor covariance matrix and forecast portfolio risk in a multi-factor risk model?
+  must: [20190507_财通证券_6dfdbf]
+  ok: [20190224_财通证券_ff5e56, 20190303_财通证券_763a46, 20190317_财通证券_447d35, 20190324_财通证券_53adb9,
+       20190409_财通证券_94d3f3, 20190416_财通证券_6c5dfa, 20190423_财通证券_1e79c0, 20190619_财通证券_3bd8a5]
+
+- id: q6
+  lang: english
+  q: Is there research on whether foreign / northbound investors act as smart money, and which styles they prefer?
+  must: [20190716_财通证券_146278]
+  ok: [20190702_财通证券_8a9283, 20240429_国金证券_769662, 20240506_国金证券_b61ef7, 20240512_国金证券_35a947, 20240526_国金证券_e392a7]
+
+- id: q7
+  lang: traditional
+  q: 有沒有用非線性動力學或混沌理論來做期貨交易策略的研究？
+  must: [nodate_unknown_9dbd98]
+  ok: []
+
+- id: q8
+  lang: simplified
+  q: A股市场存在中市值效应吗？非线性规模因子怎么计算？
+  must: [20190409_财通证券_94d3f3]
+  ok: []
+
+- id: q9
+  lang: traditional
+  q: 怎麼利用市場參與者之間看法不一致的程度來建構選股因子？
+  must: [20240615_华泰证券_5a7a4f]
+  ok: []
+
+- id: q10
+  lang: simplified
+  q: 有没有微盘股择时或风险预警的模型？用了哪些预警指标？
+  must: [20240429_国金证券_769662, 20240506_国金证券_b61ef7, 20240512_国金证券_35a947, 20240526_国金证券_e392a7]
+  ok: []

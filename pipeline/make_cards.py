@@ -37,7 +37,9 @@ def call_minimax(prompt, schema, args):
     env = load_env()
     client = anthropic.Anthropic(base_url=env["MINIMAX_BASE_URL"], api_key=env["MINIMAX_API_KEY"],
                                  timeout=1800, max_retries=3)
-    r = client.messages.create(model=env["MINIMAX_MODEL"], max_tokens=16000,
+    # thinking 不設上限時會吃光全部輸出 token、來不及輸出 JSON（POC 實測 15999/16000）
+    r = client.messages.create(model=env["MINIMAX_MODEL"], max_tokens=24000,
+                               thinking={"type": "enabled", "budget_tokens": args.thinking_budget},
                                messages=[{"role": "user", "content": prompt}])
     text = "".join(b.text for b in r.content if b.type == "text")
     u = r.usage.model_dump() if hasattr(r.usage, "model_dump") else dict(r.usage)
@@ -77,6 +79,7 @@ def main():
     ap.add_argument("--out", required=True, help="卡片輸出資料夾（相對 KB）")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--thinking", action="store_true", help="Qwen 開啟 thinking 模式")
+    ap.add_argument("--thinking-budget", type=int, default=8000, help="MiniMax thinking token 上限")
     ap.add_argument("--only", nargs="*", help="只處理這些 id")
     args = ap.parse_args()
 

@@ -36,13 +36,17 @@ def main():
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--wait", type=int, default=900, help="撞到額度限制時等待秒數")
     ap.add_argument("--max-waits", type=int, default=24)
+    ap.add_argument("--only", nargs="*", help="只處理這些 id")
     args = ap.parse_args()
 
     vocab = load_vocab()
     src, out = KB / args.src, KB / args.out
     out.mkdir(parents=True, exist_ok=True)
     waits = 0
-    for md in sorted(src.glob("*.md")):
+    mds = sorted(src.glob("*.md"))
+    if args.only:
+        mds = [m for m in mds if m.stem in args.only]
+    for md in mds:
         rid = md.stem
         if (out / f"{rid}.json").exists():
             print(f"skip  {rid}", flush=True)

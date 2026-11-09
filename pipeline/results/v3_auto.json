@@ -1,0 +1,85 @@
+{
+  "sonnet": {
+    "summary": {
+      "cards": "2/2",
+      "format_ok_pct": 100.0,
+      "vocab_violations": 0,
+      "quotes_found_pct": 100.0,
+      "numbers_missing_total": 0,
+      "cards_with_missing_numbers": 0,
+      "avg_seconds": 22.1,
+      "avg_input_tokens": 25707,
+      "avg_output_tokens": 2964
+    },
+    "per_report": {
+      "20190224_财通证券_ff5e56": {
+        "has_card": true,
+        "format_ok": true,
+        "vocab_violations": [],
+        "quotes_found": 9,
+        "quotes_total": 9,
+        "quotes_missing": [],
+        "numbers_missing": [],
+        "value_level": "medium",
+        "seconds": 19.1,
+        "input_tokens": 23550,
+        "output_tokens": 2625
+      },
+      "20190702_财通证券_8a9283": {
+        "has_card": true,
+        "format_ok": true,
+        "vocab_violations": [],
+        "quotes_found": 10,
+        "quotes_total": 10,
+        "quotes_missing": [],
+        "numbers_missing": [],
+        "value_level": "medium",
+        "seconds": 25.0,
+        "input_tokens": 27864,
+        "output_tokens": 3303
+      }
+    }
+  },
+  "minimax": {
+    "summary": {
+      "cards": "1/2",
+      "format_ok_pct": 100.0,
+      "vocab_violations": 0,
+      "quotes_found_pct": 100.0,
+      "numbers_missing_total": 0,
+      "cards_with_missing_numbers": 0,
+      "avg_seconds": 130.0,
+      "avg_input_tokens": 18791,
+      "avg_output_tokens": 18528,
+      "primary_family_match_pct": 100.0,
+      "top_method_match_pct": 100.0,
+      "method_recall_vs_gold_pct": 87.5,
+      "value_level_match_pct": 0.0
+    },
+    "per_report": {
+      "20190224_财通证券_ff5e56": {
+        "has_card": false,
+        "error": "no card"
+      },
+      "20190702_财通证券_8a9283": {
+        "has_card": true,
+        "format_ok": true,
+        "vocab_violations": [],
+        "quotes_found": 10,
+        "quotes_total": 10,
+        "quotes_missing": [],
+        "numbers_missing": [],
+        "value_level": "high",
+        "primary_family_match": true,
+        "top_method_match": true,
+        "method_recall_vs_gold": 0.875,
+        "value_level_match": false,
+        "gold_primary_family": "factor-construction",
+        "primary_family": "factor-construction",
+        "seconds": 130.0,
+        "input_tokens": 18791,
+        "output_tokens": 18528
+      }
+    }
+  }
+}
