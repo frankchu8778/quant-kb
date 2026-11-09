@@ -6,3 +6,4 @@ inbox/**/*.pdf
 **/images/
 *.lance/
 __pycache__/
+pipeline/logs/*.log

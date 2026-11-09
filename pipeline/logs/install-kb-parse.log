@@ -148,3 +148,14 @@ Downloading brotli (1.4MiB)
  Downloaded scipy
  Downloaded nvidia-cuda-nvrtc
  Downloaded pyarrow
+ Downloaded nvidia-nvshmem-cu13
+ Downloaded nvidia-cusparse
+ Downloaded nvidia-cufft
+ Downloaded nvidia-cusolver
+error: Failed to download `nvidia-nccl-cu13==2.30.7`
+  cause: Failed to acquire lock on the distribution cache
+  cause: Could not acquire lock
+  cause: Timeout (300s) when waiting for lock on `/home/newt/.cache/uv/wheels-v7/pypi/nvidia-nccl-cu13/2.30.7-py3-none-manylinux_2_18_x86_64.lock` at `.cache/uv/wheels-v7/pypi/nvidia-nccl-cu13/2.30.7-py3-none-manylinux_2_18_x86_64.lock`, is another uv process running? You can set `UV_LOCK_TIMEOUT` to increase the timeout.
+
+hint: `nvidia-nccl-cu13` (v2.30.7) was included because `flagembedding` (v1.4.2) depends on `torch` (v2.15.0) which depends on `nvidia-nccl-cu13`
+exit=2
