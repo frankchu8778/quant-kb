@@ -1,0 +1,115 @@
+{
+  "title": "基于混沌理论的股指期货噪声趋势交易(NTT)策略",
+  "broker": "广发证券",
+  "date": null,
+  "series": "股指期货专题系列报告",
+  "report_type": "系列专题",
+  "value_level": "medium",
+  "value_reason": "提出基于混沌粗糙熵的噪声过滤机制，为趋势跟踪策略提供新的状态判别维度，实证展示了过滤随机波动对提升胜率与夏普比率的潜力，但参数敏感且样本较短。",
+  "primary_family": "trend-following",
+  "families": [
+    "trend-following",
+    "derivatives-strategy"
+  ],
+  "methods": [
+    "chaos-fractal",
+    "noise-filtering",
+    "trend-signal",
+    "index-futures"
+  ],
+  "new_tag_suggestions": [
+    "粗糙熵",
+    "Levenberg-Marquardt拟合",
+    "相空间重构",
+    "递归图(RP)"
+  ],
+  "data_needed": [
+    "股指期货30秒高频行情数据",
+    "日频收盘价"
+  ],
+  "summary": "报告基于混沌理论构建粗糙熵-噪声非线性方程，通过Levenberg-Marquardt非线性拟合计算股指期货高频价格序列的噪声比例(NTS)。利用上午噪声较小且呈单边走势时，午后顺势建仓并收盘平仓的机制，构建噪声趋势交易(NTT)模型。实证表明，加入噪声判据的NTT模型相比普通趋势交易，在成功率、累积收益率和夏普比率上均有显著优化。",
+  "core_idea": "将混沌理论中的粗糙熵与噪声估计引入趋势交易，通过量化价格序列中的“噪声占比”(NTS)来过滤随机游走阶段，仅在噪声低（人为/趋势性强）且上午已现单边形态时介入午后趋势，从而提升趋势跟踪策略的胜率与风险收益比。",
+  "method_steps": [
+    "提取股指期货当月连续合约30秒高频数据",
+    "对每日10:00-11:30数据重构相空间（嵌入维n=180，时滞τ=1）",
+    "利用LM非线性拟合解算噪声标准差与原始标准差比值，得到噪声比例NTS",
+    "设定NTS阈值与上午价差阈值dif判定单边走势",
+    "若上午NTS低于阈值且满足dif条件，则午后开盘顺势建仓，收盘前平仓",
+    "统计交易指标并与无噪声普通趋势交易对比"
+  ],
+  "key_formulas": [
+    {
+      "latex": "NTS = \\frac{\\sigma_{nosy}}{\\sigma_{data}}",
+      "meaning": "噪声比例计算公式"
+    },
+    {
+      "latex": "K_{noisy}(\\varepsilon) = -\\frac{d}{d n} \\ln \\left[D_{n}(\\varepsilon)\\right]",
+      "meaning": "粗糙熵定义式"
+    },
+    {
+      "latex": "K_{n o i s y}(\\varepsilon) \\varepsilon^{p}=c \\varepsilon^{p} g\\left(\\frac{\\varepsilon}{2 \\sigma}\\right) \\ln \\varepsilon +\\left[\\kappa+b \\ln (1-a \\varepsilon)\\right] \\varepsilon^{p}\\left(1+\\sqrt{\\pi} \\frac{\\sqrt{\\varepsilon^{2} / 3+2 \\sigma^{2}}-\\varepsilon / \\sqrt{3}}{\\varepsilon}\\right)",
+      "meaning": "粗糙熵非线性拟合方程"
+    },
+    {
+      "latex": "P ( i , j ) = H ( \\varepsilon - \\left\\| \\vec { y } _ { i } - \\vec { y } _ { j } \\right\\| )",
+      "meaning": "递归图(RP)二元函数"
+    },
+    {
+      "latex": "K \\approx \\ln \\frac{<n>-1}{<n>-2}",
+      "meaning": "平均嵌入维与关联熵关系式"
+    }
+  ],
+  "key_results": [
+    {
+      "metric": "年化累积收益率",
+      "value": "86.6%",
+      "context": "5倍杠杆下扫描阈值平台结构",
+      "quote": "通过扫描上述阈值平台结构,可以获得平均 86.6%的年化累积收益率(以 5 倍杠杆计算)"
+    },
+    {
+      "metric": "成功率",
+      "value": "70%",
+      "context": "扫描阈值平台结构平均值",
+      "quote": "成功率平均值达到 70%"
+    },
+    {
+      "metric": "夏普比率",
+      "value": "2.173",
+      "context": "dif=0.014时NTT模型样本内结果",
+      "quote": "夏普比率 | 2.173"
+    },
+    {
+      "metric": "累积收益率",
+      "value": "81.74%",
+      "context": "dif=0.014时NTT模型样本内结果",
+      "quote": "累积收益率达到81.74%"
+    }
+  ],
+  "limitations": [
+    "样本区间仅一年（2010.4.16-2011.4.15），历史数据偏少",
+    "实证未计入交易成本",
+    "暂时无法应用于高频交易",
+    "[推断] 混沌理论参数（嵌入维、时滞、阈值）对数据频率和市场状态敏感，可能存在过拟合风险",
+    "[推断] 仅针对股指期货，未测试其他品种或更长周期"
+  ],
+  "reproducibility": "medium",
+  "reproducibility_reason": "核心算法（相空间重构、粗糙熵计算、LM拟合）有明确数学公式与参数设定，但非线性拟合的收敛条件与具体实现细节需自行调试，且高频数据获取与处理有一定门槛。",
+  "evidence_quotes": [
+    {
+      "claim": "混沌理论核心思想",
+      "quote": "混沌是看似随机但却具有确定性的动力学演化现象,对初始条件具有极强的敏感性。"
+    },
+    {
+      "claim": "噪声比例研判逻辑",
+      "quote": "通过该值与原始时间序列标准差的比值,即噪声在时间序列中的占比,对股指期货市场状况做出研判。"
+    },
+    {
+      "claim": "交易机制设计",
+      "quote": "当上午噪声较小,即市场效率较低、人为操作因素较强,并且市场形态呈现单边走势时,我们选择在午后对股指期货进行单向的趋势性建仓,并于收盘前平仓。"
+    },
+    {
+      "claim": "策略优化效果",
+      "quote": "经过与无噪声条件的普通趋势交易对比,我们发现经过加入噪声阈值的判定,可以对普通趋势交易进行有效优化,大为改善投资效果。"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20240615_华泰证券_5a7a4f.md",
+  "prompt_chars": 26334,
+  "usage": {
+    "input_tokens": 13487,
+    "output_tokens": 5451
+  },
+  "seconds": 446.4,
+  "validation_errors": []
+}

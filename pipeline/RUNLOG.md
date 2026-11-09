@@ -66,3 +66,11 @@ vLLM 也提示「GPU 不支援原生 FP4」，改用 Marlin 做 4-bit 權重運�
 - 試跑 Sonnet 時漏加篇數限制，整批 20 篇被丟到背景且未追蹤 → 發現後終止該程序（未產生任何檔案），補上 `--only` 參數後重跑
 - 一條指令誤夾 `rm -rf /dev/null`（本身無作用）→ 被權限系統擋下，未執行；之後所有指令不含刪除
 - MiniMax 第一次試跑：thinking 吃光 16000 輸出 token，沒產出 JSON → 提高 `max_tokens` 到 24000、加 thinking 上限（MiniMax 似乎不理會上限，但總量夠用）。失敗結果移到 `cards/poc/_failed_attempts/`
+
+## 8. 驗證與建卡（摘要，完整數據見 POC_REPORT.md）
+
+- V1：basic 與 standard 都及格；standard 的行內公式較乾淨
+- V2：v1 規則誤刪報告導言 → v2 規則誤刪 0
+- V3：prompt v1 → v2 後，MiniMax 硬性條件全過、主要分類 85%（略低於 90%）；Qwen v1 有 1 個推算錯誤的數字，v2 加 thinking 後硬性條件及格但方法標籤涵蓋率 69%、每篇 650 秒 → 不採用
+- V4：Sonnet / MiniMax / Qwen 三種卡片都是 10 題全找到（20 篇規模，代表性有限）
+- 結束時已關閉 Qwen vLLM 服務，GPU 已釋放

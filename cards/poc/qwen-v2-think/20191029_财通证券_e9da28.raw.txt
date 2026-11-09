@@ -1,0 +1,113 @@
+{
+  "title": "似是而非:横截面回归还是时间序列回归?",
+  "broker": "财通证券",
+  "date": "2019-10-29",
+  "series": "“拾穗”多因子系列报告(第 19 期)",
+  "report_type": "系列专题",
+  "value_level": "medium",
+  "value_reason": "对多因子模型中时间序列回归与横截面回归的异同、R方含义及因子暴露计算方式进行了系统比较与实证，对理解因子检验和模型构建有参考价值，但未提出全新因子或策略框架。",
+  "primary_family": "factor-testing",
+  "families": [
+    "factor-testing",
+    "factor-construction",
+    "risk-model"
+  ],
+  "methods": [
+    "cross-sectional-regression",
+    "time-series-regression",
+    "ic-analysis",
+    "factor-risk-model",
+    "size",
+    "value",
+    "neutralization"
+  ],
+  "new_tag_suggestions": [],
+  "data_needed": [
+    "日频行情数据",
+    "个股财务数据（市值、账面市值比等）",
+    "无风险利率",
+    "指数成分及权重"
+  ],
+  "summary": "报告系统比较了以Fama-French为代表的时间序列回归和以Barra为代表的横截面回归在因子收益与暴露计算、R方解释度上的差异。实证表明，横截面回归得到的因子暴露（个股特征）选股效果优于时序回归系数；两者R方因建模目标不同（解释vs预测）不可直接比较。判断回归类型的关键在于截距项是否带时间下标。",
+  "core_idea": "澄清了时间序列回归与横截面回归在资产定价中的本质区别：前者侧重收益解释（R方高），后者侧重收益预测（R方低）；并指出时序剔除与横截面剔除不等价，因子暴露直接采用个股特征在选股上更有效。",
+  "method_steps": [
+    "构建因子收益：采用Fama-French分组法（Double-Sort）或横截面WLS回归计算因子溢价。",
+    "估计因子暴露：时间序列回归（个股收益对因子收益回归）或直接使用个股横截面特征值。",
+    "计算R方并对比：对组合或个股进行滚动/截面回归，观察R方差异。",
+    "检验选股效果：计算各暴露指标的Rank IC及月胜率。",
+    "分析截距项与相关性：通过公式下标判断回归类型，并检验时序剔除后横截面残留的相关性。"
+  ],
+  "key_formulas": [
+    {
+      "latex": "$r_{i}-r_{f}=\beta_{i}\big[r_{m}-r_{f}\big]+\u03b5_{i}$",
+      "meaning": "CAPM单因子模型"
+    },
+    {
+      "latex": "$r_{i}-r_{f}=\u03b1_{i}+\beta_{i}(r_{m}-r_{f})+s_{i}SMB+h_{i}HML+\u03b5_{i}$",
+      "meaning": "Fama-French三因子时间序列回归模型"
+    },
+    {
+      "latex": "$r_{n}=f_{c}+\u03a3_{s=1}X_{ns}f_{s}+\u03b5_{n}$",
+      "meaning": "Barra横截面回归模型"
+    },
+    {
+      "latex": "$\frac{(S/L+S/N+S/H)}{3}-\frac{(B/L+B/N+B/H)}{3}$",
+      "meaning": "SMB因子收益的分组构建公式"
+    },
+    {
+      "latex": "$R_{i,t}-R_{f,t}=\u03b1_{i}+\beta_{mkt,i}(R_{mkt,t}-R_{f,t})+\beta_{hml,i}R_{hml,t}+\beta_{smb,i}R_{smb,t}+\u03b5_{i,t}$",
+      "meaning": "Blitz特质动量时间序列回归示例"
+    }
+  ],
+  "key_results": [
+    {
+      "metric": "BP因子RankIC-T值",
+      "value": "4.81",
+      "context": "Wind全A指数回测(2006.2.28-2019.9.27)",
+      "quote": "Size因子的T值达到-2.81,而BP因子在经过市值和行业中性化之后达到4.81"
+    },
+    {
+      "metric": "Fama-French组合回归R方均值",
+      "value": "96%",
+      "context": "5×5规模-账面市值比分组组合",
+      "quote": "可以看到各组的模型拟合R方都较高,其均值在96%左右"
+    },
+    {
+      "metric": "Barra横截面回归R方",
+      "value": "25%左右",
+      "context": "个股下期收益对当期因子暴露回归",
+      "quote": "因此其R方往往在25%左右,相较之下更小。"
+    },
+    {
+      "metric": "SMB因子与简单因子组合相关系数",
+      "value": "0.96以上",
+      "context": "时序因子收益与横截面因子收益月度相关系数",
+      "quote": "SMB因子收益与HML因子收益都与其对应的简单因子组合有着更为紧密的关联,其相关系数能够达到0.96以上"
+    }
+  ],
+  "limitations": [
+    "[推断] 未考虑实际交易成本与换手率对因子组合收益的影响。",
+    "实证区间为2006-2019年，A股市场制度与风格可能已发生变化。",
+    "仅对比了Fama-French与Barra的基础框架，未深入探讨高阶风险模型或非线性因子。"
+  ],
+  "reproducibility": "high",
+  "reproducibility_reason": "报告提供了完整的因子收益分组构建逻辑、回归公式、样本区间及绩效统计口径，数据与代码复现路径清晰。",
+  "evidence_quotes": [
+    {
+      "claim": "时间序列与横截面回归的核心区别",
+      "quote": "以Fama-French模型为代表的时间序列回归将因子收益视为已知、因子暴露视为待估计的参数;而在以Barra模型为代表的横截面回归中,将因子暴露视为已知、因子收益视为待估计的参数。"
+    },
+    {
+      "claim": "R方不可直接比较的原因",
+      "quote": "Fama-French回归更加注重收益的解释,而Barra模型更加注重收益的预测,两种回归模型讨论的并不是同一个问题,因此不能直接将其R方进行比对。"
+    },
+    {
+      "claim": "个股特征暴露选股更优",
+      "quote": "在选股能力方面,用个股特征得到的因子暴露具有更好的选股效果。"
+    },
+    {
+      "claim": "判断回归类型的关键",
+      "quote": "给定一个公式,判断其是时间序列回归还是横截面回归的关键在于截距项的表示,这一概念的明晰对于公式的规范表达至关重要。"
+    }
+  ]
+}

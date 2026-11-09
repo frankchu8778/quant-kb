@@ -1,5 +1,11 @@
 # 量化研報知識庫：部署計畫
 
+> **2026-11-10 POC 後的更新**（結果見 `POC_REPORT.md`，過程見 `pipeline/RUNLOG.md`）：
+> 下面第一、二部分的安裝步驟是 POC 之前寫的，實際執行時有這些不同：
+> - 模型改用 `nvidia/Qwen3.6-35B-A3B-NVFP4`；vLLM 要用 `~/venvs/kb-llm-cu129`（0.32.0+cu129），啟動一律用 `pipeline/serve_qwen.sh`（驅動 577 的相容設定都在裡面）
+> - MinerU 已是 4.x：`mineru-kit parse --tier basic|standard`；standard 等級的 VLM 用 `pipeline/serve_mineru_vlm.sh` + `pipeline/mineru-standard.yaml`
+> - 建卡 prompt 以 `pipeline/card_prompt_v2.md` 為準
+
 ## 現況（2026-11-10 檢查）
 
 - GPU：RTX 5090 32GB，驅動 577.00，CUDA 12.9（Blackwell，需用 cu128 以上的 wheel）

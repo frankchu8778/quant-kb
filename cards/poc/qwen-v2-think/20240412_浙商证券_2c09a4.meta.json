@@ -1,0 +1,11 @@
+{
+  "engine": "qwen",
+  "src": "fulltext/poc/clean-v2/20240412_浙商证券_2c09a4.md",
+  "prompt_chars": 17495,
+  "usage": {
+    "input_tokens": 8486,
+    "output_tokens": 8227
+  },
+  "seconds": 674.5,
+  "validation_errors": []
+}
