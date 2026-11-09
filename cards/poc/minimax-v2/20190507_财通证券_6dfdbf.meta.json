@@ -1,0 +1,23 @@
+{
+  "engine": "minimax",
+  "src": "fulltext/poc/clean-v2/20190507_财通证券_6dfdbf.md",
+  "prompt_chars": 43014,
+  "usage": {
+    "cache_creation": null,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 198,
+    "inference_geo": null,
+    "input_tokens": 21727,
+    "output_tokens": 17878,
+    "output_tokens_details": {
+      "thinking_tokens": 15629
+    },
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": null
+  },
+  "seconds": 89.4,
+  "validation_errors": [
+    "缺欄位 new_tag_suggestions"
+  ]
+}

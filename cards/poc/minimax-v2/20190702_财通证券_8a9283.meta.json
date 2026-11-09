@@ -1,0 +1,21 @@
+{
+  "engine": "minimax",
+  "src": "fulltext/poc/clean-v2/20190702_财通证券_8a9283.md",
+  "prompt_chars": 35735,
+  "usage": {
+    "cache_creation": null,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 198,
+    "inference_geo": null,
+    "input_tokens": 18713,
+    "output_tokens": 16633,
+    "output_tokens_details": {
+      "thinking_tokens": 14147
+    },
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": null
+  },
+  "seconds": 78.4,
+  "validation_errors": []
+}

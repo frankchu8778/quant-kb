@@ -1,0 +1,23 @@
+{
+  "engine": "minimax",
+  "src": "fulltext/poc/clean-v2/20240412_浙商证券_2c09a4.md",
+  "prompt_chars": 17495,
+  "usage": {
+    "cache_creation": null,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 198,
+    "inference_geo": null,
+    "input_tokens": 7623,
+    "output_tokens": 16598,
+    "output_tokens_details": {
+      "thinking_tokens": 14421
+    },
+    "server_tool_use": null,
+    "service_tier": null,
+    "speed": null
+  },
+  "seconds": 104.8,
+  "validation_errors": [
+    "缺欄位 new_tag_suggestions"
+  ]
+}
