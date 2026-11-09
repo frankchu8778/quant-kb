@@ -1,0 +1,8 @@
+.env
+# 原始 PDF 和 Windows 附加檔不進 git
+inbox/**/*.pdf
+*Zone.Identifier
+# 大型產出物（圖片、模型、環境）
+**/images/
+*.lance/
+__pycache__/
