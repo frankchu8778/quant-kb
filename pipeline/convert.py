@@ -9,6 +9,7 @@
 1. mineru-kit parse 原始輸出 → pipeline/_mineru_raw/<tier>/（完整保留，不修改）
 2. 整理 → fulltext/poc/<tier>/<id>.md
    - 檔名改成穩定 id（日期_券商_雜湊）
+   - NFKC 正規化：數學花體字 𝑹𝟐 → R2、全形英數 → 半形（grep 才搜得到）
    - base64 內嵌圖片另存成檔案 fulltext/poc/<tier>/images/<id>/img_NN.<ext>，Markdown 裡換成相對連結
 3. 對照表 → fulltext/poc/<tier>/_index.json（id ↔ 原始檔名、頁數耗時等）
 """
@@ -18,6 +19,7 @@ import json
 import re
 import subprocess
 import time
+import unicodedata
 
 from common import FULLTEXT, INBOX, PIPELINE, poc_pdfs, report_id
 
@@ -57,7 +59,7 @@ def postprocess(tier, raw_dir):
             (img_dir / name).write_bytes(base64.b64decode(m.group(3)))
             return f"![{m.group(1)}](images/{rid}/{name})"
 
-        text = IMG_RE.sub(save, text)
+        text = unicodedata.normalize("NFKC", IMG_RE.sub(save, text))
         (out / f"{rid}.md").write_text(text)
         index[rid] = {"source_pdf": pdf.name, "chars": len(text), "images": n}
     (out / "_index.json").write_text(json.dumps(index, ensure_ascii=False, indent=2))

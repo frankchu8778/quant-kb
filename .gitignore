@@ -7,3 +7,5 @@ inbox/**/*.pdf
 *.lance/
 __pycache__/
 pipeline/logs/*.log
+pipeline/_mineru_raw/
+pipeline/_mineru_test/
