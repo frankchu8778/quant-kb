@@ -1,0 +1,113 @@
+{
+  "title": "牛市抢跑者:低 Beta 一定代表低风险吗?“拾穗”多因子系列报告(第 9 期)",
+  "broker": "财通证券",
+  "date": "2019-04-16",
+  "series": "“拾穗”多因子系列",
+  "report_type": "系列专题",
+  "value_level": "medium",
+  "value_reason": "对已知Beta因子进行纯因子与简单因子对比、行业暴露分析及市场状态情景测试，提供配置参考，但非全新因子或模型。",
+  "primary_family": "factor-construction",
+  "families": [
+    "factor-construction",
+    "factor-testing",
+    "risk-model",
+    "market-commentary"
+  ],
+  "methods": [
+    "beta",
+    "quantile-backtest",
+    "ic-analysis",
+    "style-attribution",
+    "neutralization",
+    "factor-risk-model"
+  ],
+  "new_tag_suggestions": [],
+  "data_needed": [
+    "日频行情数据",
+    "指数成分股及权重",
+    "财务报表数据",
+    "Wind全A指数数据"
+  ],
+  "summary": "本文深入探讨Beta因子的有效性及纯因子与简单因子的差异，指出高Beta股票常伴随高换手与高波动从而侵蚀收益。通过情景分析发现，Beta策略在熊牛切换期表现优异，在持续牛市中高Beta占优，在持续熊市中低Beta占优。报告同时提供行业Beta测算方法及指数风险预测。",
+  "core_idea": "揭示简单Beta因子收益为负而纯Beta因子收益为正的根本原因在于高Beta股票同时暴露于高换手和高波动等负向因子；并验证Beta策略的有效性高度依赖市场状态（牛熊切换期最强），为动态配置提供依据。",
+  "method_steps": [
+    "计算个股Beta值：使用过去252天日收益率对流通市值加权指数收益率进行半衰指数加权回归（半衰期63天）。",
+    "构建简单与纯Beta组合：简单组合按Beta值排序分组；纯组合通过横截面回归剥离其他风格因子暴露后构建。",
+    "行业Beta测算：采用行业内个股Beta值的市值加权法或行业指数回归法计算。",
+    "分组回测与IC分析：将全A股票按Beta值分10组，计算各组月均超额收益、Rank IC及t值。",
+    "情景状态划分：根据过去12个月及当月市场涨跌幅划分Up/Down/Momentum/Reverse等6种状态，测试各状态下多空组合收益与IC。",
+    "指数风险预测：基于Barra模型框架，利用成分股权重与协方差矩阵估计指数未来一月年化波动率。"
+  ],
+  "key_formulas": [
+    {
+      "latex": "$\\beta_i = \\frac{cov(r_i, r_m)}{\\sigma_m^2}$",
+      "meaning": "个股Beta计算公式"
+    },
+    {
+      "latex": "$Risk(P) = W'VW = W'(X'FX + \\Delta)W$",
+      "meaning": "指数风险预测公式（共同风险+特质风险）"
+    },
+    {
+      "latex": "$r_t = \\alpha + \\beta R_t + e_t$",
+      "meaning": "Beta回归模型设定"
+    }
+  ],
+  "key_results": [
+    {
+      "metric": "2019年样本区间纯Beta因子收益",
+      "value": "5.36%",
+      "context": "2018.12.28-2019.4.12期间",
+      "quote": "在样本区间内已经获得了5.36%的高收益"
+    },
+    {
+      "metric": "全样本期Beta因子Rank IC均值",
+      "value": "-1.03%",
+      "context": "2006.1.25-2019.4.4分组回测",
+      "quote": "在回测区间因子的 rankIC 为-1.03%"
+    },
+    {
+      "metric": "银行业Beta均值",
+      "value": "0.67",
+      "context": "2019年以来行业Beta测算",
+      "quote": "银行业的 Beta均值仅为0.67"
+    },
+    {
+      "metric": "沪深300高低贝塔相对净值收益",
+      "value": "19%",
+      "context": "2018.12.28-2019.4.12期间",
+      "quote": "沪深 300 高低贝塔相对净值已经获得 19%的收益"
+    },
+    {
+      "metric": "预测波动率区间",
+      "value": "23%-31%",
+      "context": "样本指数未来一个月年化波动预测",
+      "quote": "所有样本指数未来一月的年化波动区间在 23%-31%之间"
+    }
+  ],
+  "limitations": [
+    "样本区间较短（2019年部分数据），长期有效性需进一步验证。",
+    "Beta计算依赖252天历史数据，对近期市场结构突变反应可能存在滞后。",
+    "情景分析基于历史划分规则，未来市场状态切换频率或幅度变化可能导致策略失效。",
+    "未考虑交易成本与冲击成本，实际多空组合收益可能低于理论值。[推断]"
+  ],
+  "reproducibility": "high",
+  "reproducibility_reason": "因子计算规则、分组方法、情景划分标准及风险预测公式均详细披露，数据源明确（Wind），可直接复现。",
+  "evidence_quotes": [
+    {
+      "claim": "简单Beta与纯Beta表现差异的原因",
+      "quote": "简单Beta因子组合在流动性和波动率上的高暴露在一定程度上腐蚀了组合收益,从而导致高Beta组合走势不如低Beta组合。"
+    },
+    {
+      "claim": "Beta策略在不同市场状态下的有效性",
+      "quote": "在市场由牛转熊的切换中,低 Beta 策略能够为组合提供一定的保护性。在市场由熊转牛的切换中,高 Beta 策略能够为组合带来较高的攻击性。"
+    },
+    {
+      "claim": "行业Beta计算与银行业表现",
+      "quote": "行业 Beta 的计算可以根据行业指数计算,也可根据行业成分股的Beta 市值加权计算得到,二者差异不大。"
+    },
+    {
+      "claim": "指数风险预测结果",
+      "quote": "所有样本指数未来一月的年化波动区间在 23%-31%之间"
+    }
+  ]
+}

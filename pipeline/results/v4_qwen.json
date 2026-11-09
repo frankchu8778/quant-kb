@@ -1,0 +1,525 @@
+{
+  "q1": {
+    "lang": "traditional",
+    "q": "哪些研報在研究動量因子，或是動量因子的改進版本（例如剔除風格暴露後的動量）？",
+    "relevant_ids": [
+      "20190702_财通证券_8a9283",
+      "20191029_财通证券_e9da28"
+    ],
+    "answer": "核心研报是 20190702_财通证券_8a9283(特质动量因子):原始特质动量因与高估值、高波动等反转特征相关而失效;正交化剔除 Beta、BP、市值、换手率和波动率后,RankIC t 值为 5.47,沪深300指数增强年化超额 5.24%。剔除风格后,横截面动量无效(t 值 0.93)。20191029_财通证券_e9da28 部分相关:它以特质动量为例,说明时序剔除不等于横截面正交化。",
+    "parse_error": false,
+    "num_turns": 5,
+    "peak_context_tokens": 13435,
+    "usage": {
+      "input_tokens": 8,
+      "cache_creation_input_tokens": 8662,
+      "cache_read_input_tokens": 29499,
+      "output_tokens": 1847,
+      "output_tokens_details": {
+        "thinking_tokens": 104
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 8662,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1157,
+          "cache_read_input_tokens": 11143,
+          "cache_creation_input_tokens": 2290,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 2290
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.056083900000000006,
+    "seconds": 19.9,
+    "raw_result": "知识库里只有一篇研报专门研究动量因子及其改进版本。另有一篇只涉及一小部分。\n\n**直接相关**\n- **`20190702_财通证券_8a9283`**,《补充:基于特质动量因子的沪深 300 指数增强策略》,属于“拾穗”多因子系列第 14 期。\n  - 特质动量因子(也称残差动量)的算法是:累计特质收益除以特质波动率。\n  - 原始值的多头组合偏向高估值、高波动、高换手、大市值的股票。这些特征在 A 股都有反转效应,因此原始因子表现为失效。\n  - 对它做正交化,剔除 Beta、BP、市值、21 天换手率和 21 天波动率的影响后,选股能力明显增强。剔除 Beta 后,RankIC 的 t 值为 5.47。\n  - 在沪深 300 成分股中构建指数增强组合,年化超额收益为 5.24%。\n  - 剔除已知风格因子后,横截面动量因子没有选股能力,RankIC 的 t 值仅 0.93,不显著。这说明传统动量的收益可能主要来自风格暴露。\n  - 上述数字来自卡片,我没有回到全文核对。\n\n**部分相关**\n- **`20191029_财通证券_e9da28`**,《似是而非:横截面回归还是时间序列回归?》。\n  - 主题是时序回归与横截面回归的方法差异,动量只是其中的一个例子。\n  - 文中指出,特质动量在时间序列上剔除市值和价值的影响后,横截面上仍与 Size 和 BP 强相关。所以时序剔除不等于横截面正交化。\n  - 这一点对动量的风格剔除有参考价值。\n\n**已读过、判定不相关**\n- `20190716_财通证券_146278`:只提到外资偏好高动量股票。\n- `20240615_华泰证券_5a7a4f`:只提到分歧度因子的收益与动量效应下的买卖不对称有关。\n- `20240506_国金证券_b61ef7`:只在描述大盘股的风格时提到“延续动量配置”。\n- `20190416_财通证券_6c5dfa`:动量只是 Beta 情景分析里的市场状态划分。\n- `20190224_财通证券_ff5e56`、`20190303_财通证券_763a46`、`20190507_财通证券_6dfdbf`:动量只是关键词或风格因子列表中的一项,没有对动量的研究。\n\n{\"relevant_ids\": [\"20190702_财通证券_8a9283\", \"20191029_财通证券_e9da28\"], \"answer\": \"核心研报是 20190702_财通证券_8a9283(特质动量因子):原始特质动量因与高估值、高波动等反转特征相关而失效;正交化剔除 Beta、BP、市值、换手率和波动率后,RankIC t 值为 5.47,沪深300指数增强年化超额 5.24%。剔除风格后,横截面动量无效(t 值 0.93)。20191029_财通证券_e9da28 部分相关:它以特质动量为例,说明时序剔除不等于横截面正交化。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q2": {
+    "lang": "english",
+    "q": "Which reports apply machine learning to factor construction or stock selection?",
+    "relevant_ids": [
+      "20240416_招商证券_b64476",
+      "20240615_华泰证券_5a7a4f"
+    ],
+    "answer": "两篇研报用机器学习做因子构建或选股。招商证券《利用基本面信息改进机器学习因子》用风险调整后的收益作学习目标,以 GBDT、MLP、GRU 融合量价与基本面因子,并构建周频指数增强策略。华泰证券《机器学习用于模拟投资者分歧》用 50 个 LightGBM 模型预测值的标准差构建分歧度因子,再与预测均值构成的认可度因子合成,用于选股。",
+    "parse_error": false,
+    "num_turns": 7,
+    "peak_context_tokens": 19695,
+    "usage": {
+      "input_tokens": 8,
+      "cache_creation_input_tokens": 14922,
+      "cache_read_input_tokens": 37674,
+      "output_tokens": 1898,
+      "output_tokens_details": {
+        "thinking_tokens": 101
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 14922,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1071,
+          "cache_read_input_tokens": 19374,
+          "cache_creation_input_tokens": 319,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 319
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.08245140000000001,
+    "seconds": 21.6,
+    "raw_result": "知识库里有两篇研报用机器学习做因子构建或选股。\n\n- **`20240416_招商证券_b64476`(利用基本面信息改进机器学习因子)**:\n  - 先从学习目标(未来 T+1 至 T+11 日的 VWAP 收益率)中剔除行业、市值和 Beta 的影响。\n  - 量价数据用 MLP、GBDT、GRU 等模型训练,基本面数据只用 GBDT。\n  - 两类因子再用 GBDT 集成为综合因子,并据此做沪深300、中证500、中证1000 的周频指数增强。\n  - 三个指增的年化超额收益分别为 13.83%、22.22%、27.06%。\n  - 综合因子多头年化收益率为 38.97%。\n- **`20240615_华泰证券_5a7a4f`(人工智能系列之 80:机器学习用于模拟投资者分歧)**:\n  - 训练 50 个 LightGBM 模型,每个模型随机取 43 个截面特征中的 20 个,预测未来 10 日收益。\n  - 同一只股票 50 个预测值的标准差是\"分歧度因子\",均值是\"认可度因子\"。\n  - 分歧度因子的周度 RankIC 均值为 7.66%,分 5 层后 TOP 组合的年化超额收益为 9.71%。\n  - 两个因子等权合成后,RankIC 均值为 9.02%。\n  - 这两组数字取自卡片的结果表。卡片\"原文依据\"引用的原文写的是 6.06% 和 9.75%,与结果表不一致。我没有查全文核对,引用时请先核实。\n  - 回测未计交易费用,周频双边换手率约 62%。\n\n另外两篇有机器学习字样,但与问题无关:\n\n- **`20240412_浙商证券_2c09a4`(机器学习与因子(五):基于变点识别的量化产品分析)**:用变点识别、K-means 和单层感知机反推量化指增产品的持仓,做的是产品分析和风格归因,不是选股或因子构建。\n- **`nodate_unknown_9dbd98`(基于混沌理论的股指期货噪声趋势交易(NTT)策略)**:用混沌理论和 Levenberg-Marquardt 拟合做股指期货趋势过滤。它没有用机器学习选股,神经网络只是分类标签。\n\n{\"relevant_ids\": [\"20240416_招商证券_b64476\", \"20240615_华泰证券_5a7a4f\"], \"answer\": \"两篇研报用机器学习做因子构建或选股。招商证券《利用基本面信息改进机器学习因子》用风险调整后的收益作学习目标,以 GBDT、MLP、GRU 融合量价与基本面因子,并构建周频指数增强策略。华泰证券《机器学习用于模拟投资者分歧》用 50 个 LightGBM 模型预测值的标准差构建分歧度因子,再与预测均值构成的认可度因子合成,用于选股。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q3": {
+    "lang": "traditional",
+    "q": "做因子資料清洗時，缺失值和極端值應該怎麼處理？有沒有比較過不同方法？",
+    "relevant_ids": [
+      "20190317_财通证券_447d35",
+      "20190324_财通证券_53adb9",
+      "20240416_招商证券_b64476",
+      "20240615_华泰证券_5a7a4f"
+    ],
+    "answer": "有系统比较。异常值:财通 447d35 比较了7种方法,3σ法在极端值下失效(增长率因子相关系数0.0256),MAD(0.3369)和箱形图(0.3428)更稳健,做法是拉回边界。缺失值:财通 53adb9 比较市场/行业/市值分组均值与结构化回归,结构化回归填充值与实际值相关性最高(如盈利77.88% vs 行业均值34.89%)。招商 b64476 实践为3倍MAD截断、缺失填0并用GBDT处理基本面缺失;华泰 5a7a4f 流程为去极值、行业市值中性化、标准化,但没有方法对比。",
+    "parse_error": false,
+    "num_turns": 8,
+    "peak_context_tokens": 15211,
+    "usage": {
+      "input_tokens": 12,
+      "cache_creation_input_tokens": 10438,
+      "cache_read_input_tokens": 55609,
+      "output_tokens": 2592,
+      "output_tokens_details": {
+        "thinking_tokens": 81
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 10438,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1401,
+          "cache_read_input_tokens": 14021,
+          "cache_creation_input_tokens": 1188,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 1188
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.0732569,
+    "seconds": 25.6,
+    "raw_result": "有,而且两个问题各有一篇专题研报做过系统比较,都来自财通证券“拾穗”多因子系列。另有两篇研报只是在建模流程里给出了实际用的预处理参数。\n\n**极端值(异常值)处理**(来源 20190317_财通证券_447d35)\n- 研报比较了 7 种方法:均值标准差修正(3σ)、固定比率修正(百分位)、中位数去极值(MAD)、Beat G.Briner、因子排序值标准化、箱形图、无量纲化。\n- 财务因子,尤其是增长率类,比价量因子更容易出现极端值。增长率是本期除以前期再减 1,期初数据很小就会得到异常大的数值。\n- 比较方式是看“净利润同比增长率”和“营业收入同比增长率”处理后的相关系数。原始数据是 0.0025,3σ 法是 0.0256,百分位法是 0.2879,MAD 法是 0.3369,Beat G.Briner 是 0.0237,箱形图法是 0.3428。\n- 结论:3σ 法在极端值存在时基本失效,MAD 和箱形图更稳健。做法是把超出上下界的值拉回边界。\n- 局限:研报只用相关性验证,没有给出策略收益。分位数回归比 OLS 更抗极端值,但这部分只是概念介绍,没有实证。\n\n**缺失值处理**(来源 20190324_财通证券_53adb9)\n- 研报比较了四种填充方法:市场均值、行业均值、市值分组均值、结构化回归。\n- 结构化回归的做法是:在数据完整的股票里,把目标因子对其他因子做回归(如 WLS),再用回归系数和缺失股票已有的因子值预测缺失值。\n- 评价标准是填充值与实际值的相关系数。结构化回归明显最高:盈利 77.88%(行业均值 34.89%,市值分组均值 49.61%),Beta 72.53%(39.67%,2.81%),BP 73.39%(37.77%,44.13%),成长 34.06%(7.22%,13.80%)。\n- 行业均值填充和市值分组均值填充的效果随因子不同而变化,没有一方稳定占优。\n- 局限:回归要求其他因子有数据,并且假设关系是线性的。它是基于 2019 年 3 月 15 日的单一截面检验的,长期停牌和新股可能缺乏足够数据。\n\n**其他研报给出的实际预处理做法**(不是方法对比)\n- 20240416_招商证券_b64476:因子端做 MAD 标准化并按 3 倍 MAD 截断,缺失值填 0,标签端做截面 Z-score。基本面因子覆盖率低,所以只用对缺失值更不敏感的 GBDT 建模。\n- 20240615_华泰证券_5a7a4f:预处理流程是去极值、行业市值中性化、标准化。我没有读到它对不同方法的比较。\n\n**实务建议**:先用 MAD 或箱形图去极值,再用结构化回归填充缺失值,最后标准化。机器学习模型可以直接用树模型处理缺失值。\n\n{\"relevant_ids\": [\"20190317_财通证券_447d35\", \"20190324_财通证券_53adb9\", \"20240416_招商证券_b64476\", \"20240615_华泰证券_5a7a4f\"], \"answer\": \"有系统比较。异常值:财通 447d35 比较了7种方法,3σ法在极端值下失效(增长率因子相关系数0.0256),MAD(0.3369)和箱形图(0.3428)更稳健,做法是拉回边界。缺失值:财通 53adb9 比较市场/行业/市值分组均值与结构化回归,结构化回归填充值与实际值相关性最高(如盈利77.88% vs 行业均值34.89%)。招商 b64476 实践为3倍MAD截断、缺失填0并用GBDT处理基本面缺失;华泰 5a7a4f 流程为去极值、行业市值中性化、标准化,但没有方法对比。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": [
+      "20240416_招商证券_b64476",
+      "20240615_华泰证券_5a7a4f"
+    ]
+  },
+  "q4": {
+    "lang": "simplified",
+    "q": "横截面回归和时间序列回归有什么区别？什么时候该用哪一种？",
+    "relevant_ids": [
+      "20191029_财通证券_e9da28"
+    ],
+    "answer": "区别在于已知量与待估量:时间序列回归(Fama-French)中因子收益已知、因子暴露待估,假设暴露稳定,R方高(约96%),偏解释和归因;横截面回归(Barra)中因子暴露(个股特征)已知、因子收益待估,用T-1期因子预测T期收益,R方约25%,偏预测和选股。两者R方不可直接比较。实证中直接用个股特征作暴露的选股效果优于时序回归暴露(Size RankIC T值-3.00、BP 5.75,对比时序SMB暴露1.40)。选股、因子检验、纯因子组合、中性化用横截面回归;归因、估计组合或基金暴露、检验定价模型解释力用时间序列回归。",
+    "parse_error": false,
+    "num_turns": 6,
+    "peak_context_tokens": 15099,
+    "usage": {
+      "input_tokens": 8,
+      "cache_creation_input_tokens": 10326,
+      "cache_read_input_tokens": 28243,
+      "output_tokens": 2330,
+      "output_tokens_details": {
+        "thinking_tokens": 207
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 10326,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1390,
+          "cache_read_input_tokens": 9878,
+          "cache_creation_input_tokens": 5219,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 5219
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.0674443,
+    "seconds": 28.0,
+    "raw_result": "横截面回归和时间序列回归的区别,在于回归里哪一边是已知的,哪一边是要估计的。两者回答的问题不同:时间序列回归偏解释和归因,横截面回归偏预测和选股。以下结论都来自卡片 20191029_财通证券_e9da28,数字已对照全文核实。\n\n**核心区别**\n- **时间序列回归**:代表是 Fama-French 模型。因子收益已知,由组合构建法(如按市值和 BP 做 Double-Sort)得到。因子暴露是待估参数,做法是对单只股票或组合的收益序列回归。它隐含假设暴露在时间上稳定不变。\n- **横截面回归**:代表是 Barra 模型。因子暴露已知,直接取个股特征,如市值、BP。因子收益是待估参数,做法是用下一期股票收益对上一期暴露回归。\n- **R 方含义不同**:\n  - 对 25 个市值-BP 组合做 Fama-French 时序回归,R 方均值约 96%。这是对当期收益的解释度。\n  - Barra 横截面回归的因变量是 T 期收益,自变量是 T-1 期因子值,存在一期滞后,所以 R 方只有 25% 左右。这是对下期收益的预测度。\n  - 两者讨论的不是同一个问题,R 方不能直接比较,也不说明哪个模型更好。\n- **时序剔除不等于横截面正交化**:先在时间序列上剥离市值和价值的影响,算出特质动量。结果它在横截面上仍与 Size、BP 高度相关。\n\n**实证对比(Wind 全A,2006.2–2019.9)**\n- 直接用个股特征当暴露,选股效果更好:Size 因子 RankIC 的 T 值为 -3.00,BP 因子为 5.75。\n- 时序回归得到的 SMB 暴露系数,RankIC 的 T 值只有 1.40。\n\n**什么时候用哪种**\n- **选股、因子预测和检验、构建纯因子组合、风格中性化**:用横截面回归。报告指出业界多用横截面模型,这是原因之一。\n- **归因、解释收益来源、估计组合或基金的因子暴露,以及检验定价模型对收益的解释力(看 alpha 是否接近 0)**:用时间序列回归。\n- 时序回归假设暴露稳定,而暴露实际会随时间变化,所以它的暴露估计在预测上不如横截面特征。\n- 做时序回归时,可用滚动窗口观察暴露的时变性。\n\n其他几张用到横截面回归的卡片,只是把它当作工具,不讨论两种回归的区别,因此没有列入相关结果。它们是 94d3f3(Fama-MacBeth 检验)、53adb9、447d35、1e79c0 和 6c5dfa。\n\n{\"relevant_ids\": [\"20191029_财通证券_e9da28\"], \"answer\": \"区别在于已知量与待估量:时间序列回归(Fama-French)中因子收益已知、因子暴露待估,假设暴露稳定,R方高(约96%),偏解释和归因;横截面回归(Barra)中因子暴露(个股特征)已知、因子收益待估,用T-1期因子预测T期收益,R方约25%,偏预测和选股。两者R方不可直接比较。实证中直接用个股特征作暴露的选股效果优于时序回归暴露(Size RankIC T值-3.00、BP 5.75,对比时序SMB暴露1.40)。选股、因子检验、纯因子组合、中性化用横截面回归;归因、估计组合或基金暴露、检验定价模型解释力用时间序列回归。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q5": {
+    "lang": "english",
+    "q": "How should I estimate the factor covariance matrix and forecast portfolio risk in a multi-factor risk model?",
+    "relevant_ids": [
+      "20190507_财通证券_6dfdbf"
+    ],
+    "answer": "用多因子结构化模型把协方差拆成因子协方差F和特质风险对角阵Δ,组合风险=W'(X'FX+Δ)W。F的估计依次做EWMA加权、Newey-West调整(日度转月度的自相关),再做基于蒙特卡洛偏差统计量的特征值调整。Δ先做缺失值和异常值处理,再做贝叶斯压缩,即向所在市值分组的加权平均特质风险收缩。预测效果用偏差统计量检验,正态假设下95%置信区间为[1-√(2/T),1+√(2/T)],收益尖峰厚尾时落入概率会下降。样本协方差有运算量大、不可逆、低估风险的缺陷,这是采用结构化估计的原因。",
+    "parse_error": false,
+    "num_turns": 7,
+    "peak_context_tokens": 16146,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 11373,
+      "cache_read_input_tokens": 40657,
+      "output_tokens": 2655,
+      "output_tokens_details": {
+        "thinking_tokens": 173
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 11373,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1454,
+          "cache_read_input_tokens": 13423,
+          "cache_creation_input_tokens": 2721,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 2721
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.07612769999999999,
+    "seconds": 24.2,
+    "raw_result": "**结论:** 知识库里只有一篇研报专门讲这个问题,即《多因子风险预测:从怎么做到为什么》(20190507_财通证券_6dfdbf)。下面的内容都出自这张卡片。我只读了卡片,没有回查全文核对数字。\n\n**1. 为什么不直接用样本协方差**\n- 样本协方差矩阵有三个缺点:运算量大、不可逆、偏差大。\n- 样本协方差会低估最优组合的风险,真实波动约为 σ_true ≈ σ_est / (1 − N/T)。\n- 所以改用多因子结构化估计,把协方差拆成共同风险矩阵 F 和特质风险对角阵 Δ。\n\n**2. 因子协方差矩阵 F 的估计**\n1. **EWMA(指数加权)**:给近期样本更高权重,使估计反映最近的市场状态。\n2. **Newey-West 调整**:日度估计要换算成月度预测,需要处理自相关,公式里的乘数是 21。蒙特卡洛模拟中,调整后的方差与真实方差的相关系数为 0.99。\n3. **特征值调整**:对 F 做特征值分解,用蒙特卡洛模拟算出各特征组合的偏差统计量,再按它与 1 的偏离去修正。该步骤计算量较大。\n\n**3. 特质风险 Δ 的估计**\n- 先处理缺失值和异常值,做结构化调整。\n- 再做**贝叶斯压缩**:σ_shrink = v·σ̄(市值分组) + (1−v)·σ̂。也就是把个股特质风险向所在市值分组的市值加权平均风险收缩。依据是特质风险与市值强相关。\n\n**4. 组合风险预测**\n- Risk(P) = W′VW = W′(X′FX + Δ)W。其中 W 是组合(或指数成分股)权重,X 是因子暴露。\n- 用调整后的 F 和 Δ 预测指数未来一个月的波动率。实证中样本指数的年化波动预测区间是 23%–33%。\n\n**5. 如何检验预测准不准**\n- 偏差统计量为 b = r_{t+q}/σ_t。若预测完美且收益服从正态,其 95% 置信区间是 [1−√(2/T), 1+√(2/T)]。\n- 收益的峰度越大,落入这个区间的概率越低。峰度 k=10 时均值约为 80%。\n\n**局限:** 模型基于历史数据,风格切换时可能失效。置信区间依赖正态假设,而真实收益尖峰厚尾。贝叶斯压缩可能忽略市值以外的风险来源。\n\n**其他候选卡片的判定**\n- 20190416_财通证券_6c5dfa(低 Beta 因子)和 20190224_财通证券_ff5e56(R 方解析)都只是引用同一个风险预测公式,没有讲协方差估计的细节,判为不相关。\n- 其余候选(外资持股、行业因子、预处理、规模因子、变点识别等)的关键词命中只是泛泛提及,判为不相关。\n\n{\"relevant_ids\": [\"20190507_财通证券_6dfdbf\"], \"answer\": \"用多因子结构化模型把协方差拆成因子协方差F和特质风险对角阵Δ,组合风险=W'(X'FX+Δ)W。F的估计依次做EWMA加权、Newey-West调整(日度转月度的自相关),再做基于蒙特卡洛偏差统计量的特征值调整。Δ先做缺失值和异常值处理,再做贝叶斯压缩,即向所在市值分组的加权平均特质风险收缩。预测效果用偏差统计量检验,正态假设下95%置信区间为[1-√(2/T),1+√(2/T)],收益尖峰厚尾时落入概率会下降。样本协方差有运算量大、不可逆、低估风险的缺陷,这是采用结构化估计的原因。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q6": {
+    "lang": "english",
+    "q": "Is there research on whether foreign / northbound investors act as smart money, and which styles they prefer?",
+    "relevant_ids": [
+      "20190716_财通证券_146278",
+      "20190702_财通证券_8a9283",
+      "20240506_国金证券_b61ef7"
+    ],
+    "answer": "Yes. 20190716_财通证券_146278 is the dedicated study. It finds foreign money (QFII and Stock Connect) prefers large-cap, high-valuation, high-momentum stocks and large-consumer sectors. Following foreign net inflows into individual stocks gave a 20.02% annualized long-short return (Sharpe 2.17, 2017-2019), which supports the smart-money view. The industry-rotation version stopped working after April 2018. 20190702_财通证券_8a9283 adds indirect support: the idiosyncratic-momentum long leg has good fundamentals that match foreign preferences. 20240506_国金证券_b61ef7 discusses why northbound inflows in 2024 may persist, driven by China's own market strength rather than US yields. The other 国金证券 weekly notes (20240429, 20240512, 20240526) only use northbound flow percentiles for market timing and do not test the smart-money question.",
+    "parse_error": false,
+    "num_turns": 8,
+    "peak_context_tokens": 22667,
+    "usage": {
+      "input_tokens": 6,
+      "cache_creation_input_tokens": 17894,
+      "cache_read_input_tokens": 18346,
+      "output_tokens": 2170,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 17894,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1479,
+          "cache_read_input_tokens": 6944,
+          "cache_creation_input_tokens": 15721,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 15721
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.0951226,
+    "seconds": 22.6,
+    "raw_result": "Yes. The knowledge base has one dedicated study, plus a few related reports on using northbound flow as a timing signal.\n\n**Main report: 20190716_财通证券_146278 (《是聪明钱吗?探析外资持股的风格偏好》, 财通证券 \"拾穗\" series no. 15)**\n- **Style preference:** QFII and 陆港通 (Stock Connect) money have very similar styles. Both lean toward large-cap, high-valuation, high-momentum stocks, and toward large-consumer sectors. The original text says \"更多偏向大市值、高估值、高动量的股票\".\n- **Smart-money test, stock selection:** A weekly long-short strategy goes long the top 10% by net inflow and short the bottom 10%. For 2017.1–2019.7 it returned 20.02% a year with a Sharpe ratio of 2.17, so following foreign flows into individual stocks had real excess return. The card notes this ignores trading costs.\n- **Smart-money test, industry rotation:** A long-short strategy on industry net inflows (long the top 5, short the bottom 5) did well until April 2018 and then clearly stopped working. The card suggests one cause is that the Stock Connect names are too few to represent a whole industry.\n- **Data limits:** QFII data is quarterly and covers only the top-10 holders, so it lags and carries look-ahead bias. Foreign money has also been shifting from QFII toward Stock Connect.\n- I read these figures from the card, not the full text. Check the full text before quoting them in anything formal.\n\n**Supporting report: 20190702_财通证券_8a9283 (特质动量 / idiosyncratic momentum, HS300 index enhancement)**\n- It says the long leg of the idiosyncratic-momentum factor has good fundamentals and fits foreign investors' preferences. That is indirect support for the style preference above.\n- Northbound holdings are listed as a data input. The report is mainly about factor construction and is not a study of foreign flows.\n\n**Northbound flow as a market-timing signal (国金证券 weekly notes)**\nThese reports use the percentile of the 100-day rolling average of daily northbound net buying. They hold the Wind All-A index when the percentile is above the 2/3 level and stay in cash otherwise. None of them tests whether foreigners are smart money.\n- **20240429_国金证券_769662:** The strategy beat the index by 1.07% year to date (Wind All-A −3.01%, strategy −2.07%).\n- **20240506_国金证券_b61ef7:** Northbound net inflow was 74.244 billion yuan in the first four months of 2024. The report argues this was not driven by US Treasury yields, but by strength in China's own market.\n- **20240512_国金证券_35a947:** The strategy was down 1.13% year to date, so the signal is not reliably positive.\n- **20240526_国金证券_e392a7:** The strategy was up 2.73% year to date. The report is low-value commentary.\n\nAll six candidates were read and judged relevant. The three 2024 notes with limited relevance are 20240512_国金证券_35a947, 20240526_国金证券_e392a7 and 20240429_国金证券_769662. They are timing-only, so I left them out of `relevant_ids`. The 20240506 note is included for its flow-persistence argument.\n\n{\"relevant_ids\": [\"20190716_财通证券_146278\", \"20190702_财通证券_8a9283\", \"20240506_国金证券_b61ef7\"], \"answer\": \"Yes. 20190716_财通证券_146278 is the dedicated study. It finds foreign money (QFII and Stock Connect) prefers large-cap, high-valuation, high-momentum stocks and large-consumer sectors. Following foreign net inflows into individual stocks gave a 20.02% annualized long-short return (Sharpe 2.17, 2017-2019), which supports the smart-money view. The industry-rotation version stopped working after April 2018. 20190702_财通证券_8a9283 adds indirect support: the idiosyncratic-momentum long leg has good fundamentals that match foreign preferences. 20240506_国金证券_b61ef7 discusses why northbound inflows in 2024 may persist, driven by China's own market strength rather than US yields. The other 国金证券 weekly notes (20240429, 20240512, 20240526) only use northbound flow percentiles for market timing and do not test the smart-money question.\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q7": {
+    "lang": "traditional",
+    "q": "有沒有用非線性動力學或混沌理論來做期貨交易策略的研究？",
+    "relevant_ids": [
+      "nodate_unknown_9dbd98"
+    ],
+    "answer": "有。知识库中只有一篇相关研报:广发证券《基于混沌理论的股指期货噪声趋势交易(NTT)策略》。它用相空间重构(嵌入维180)和粗糙熵-噪声非线性方程,再用Levenberg-Marquardt拟合高频价格,得到噪声占比NTS,以NTS过滤趋势信号。上午NTS较低且单边走势时,午后建仓、收盘前平仓。2010-2011年样本,5倍杠杆下年化累积收益86.6%,夏普2.173。局限是样本仅一年、未计交易成本、依赖30秒高频数据。",
+    "parse_error": false,
+    "num_turns": 4,
+    "peak_context_tokens": 10868,
+    "usage": {
+      "input_tokens": 6,
+      "cache_creation_input_tokens": 6095,
+      "cache_read_input_tokens": 18664,
+      "output_tokens": 1423,
+      "output_tokens_details": {
+        "thinking_tokens": 0
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 6095,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 965,
+          "cache_read_input_tokens": 7076,
+          "cache_creation_input_tokens": 3790,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 3790
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.0404884,
+    "seconds": 28.1,
+    "raw_result": "有。知识库里只有一篇研报直接用混沌理论做期货交易:广发证券的《基于混沌理论的股指期货噪声趋势交易(NTT)策略》(`nodate_unknown_9dbd98`)。\n\n- **思路**:先把价格序列拆成噪声(随机游走)和非噪声(人为决定的趋势)两部分,再用混沌理论里的粗糙熵算出噪声占比。噪声小说明市场非平衡性强,趋势容易延续。噪声大则多为震荡。\n- **做法**:\n  1. 取股指期货当月连续合约的 30 秒数据。\n  2. 对上午 10:00–11:30 的序列做相空间重构,嵌入维 n=180,时滞 τ=1。\n  3. 计算关联积分,再用 Levenberg-Marquardt 算法对粗糙熵-噪声非线性方程做拟合,得到噪声标准差。\n  4. 算出 NTS = 噪声标准差 / 原始数据标准差。\n  5. 如果上午 NTS 低于阈值(例如 10%),且上午是单边走势,就在午后开盘建仓、收盘前平仓。\n- **结果**:样本为 2010.4–2011.4。5 倍杠杆下年化累积收益率为 86.6%,夏普比率 2.173(dif=0.014 时),成功率 70%。研报称这优于没有噪声过滤的普通趋势交易。\n- **局限**:样本只有一年,可能过拟合。研报未计入交易成本。策略依赖高频数据,而且只适用于股指期货。嵌入维、ε 范围等参数对结果敏感,可复现度为 medium。\n\n这些数字我只读了卡片,没有去核对全文。\n\n其他卡片没有命中混沌、分形、Hurst、李雅普诺夫、相空间之类的关键词。目录里另一篇期货类报告《权重复刻》(`20190619_财通证券_3bd8a5`)讲的是指数复制和分红点位测算,与非线性动力学无关,所以我判为不相关。\n\n{\"relevant_ids\": [\"nodate_unknown_9dbd98\"], \"answer\": \"有。知识库中只有一篇相关研报:广发证券《基于混沌理论的股指期货噪声趋势交易(NTT)策略》。它用相空间重构(嵌入维180)和粗糙熵-噪声非线性方程,再用Levenberg-Marquardt拟合高频价格,得到噪声占比NTS,以NTS过滤趋势信号。上午NTS较低且单边走势时,午后建仓、收盘前平仓。2010-2011年样本,5倍杠杆下年化累积收益86.6%,夏普2.173。局限是样本仅一年、未计交易成本、依赖30秒高频数据。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q8": {
+    "lang": "simplified",
+    "q": "A股市场存在中市值效应吗？非线性规模因子怎么计算？",
+    "relevant_ids": [
+      "20190409_财通证券_94d3f3"
+    ],
+    "answer": "A股不存在中市值效应:非线性规模纯因子历年收益为负,Rank IC为-5.38%,Fama-MacBeth t值为-4.99,中市值股票并不能跑赢大小市值股票,经常跑输。计算方法有三种:①回归法,把lnSize³对lnSize回归(必须带截距项),取残差的相反数;②平方法,把lnSize做z-score后取平方,再取相反数;③Menchero法,先标准化lnSize,再用标准化后的立方对其回归取残差。前两种方法在本质上无区别,相关系数为0.87。",
+    "parse_error": false,
+    "num_turns": 6,
+    "peak_context_tokens": 15929,
+    "usage": {
+      "input_tokens": 8,
+      "cache_creation_input_tokens": 11156,
+      "cache_read_input_tokens": 28942,
+      "output_tokens": 2115,
+      "output_tokens_details": {
+        "thinking_tokens": 68
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 11156,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1267,
+          "cache_read_input_tokens": 10301,
+          "cache_creation_input_tokens": 5626,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 5626
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.0686842,
+    "seconds": 10.0,
+    "raw_result": "**结论:A股没有中市值效应。** 中市值股票不但没跑赢大市值和小市值股票,还经常跑输。(来源:20190409_财通证券_94d3f3)\n\n**非线性规模因子怎么算**(来源:20190409_财通证券_94d3f3,全文 1.1 节)\n\n目标是让市值居中的股票因子值最大,两端(大市值、小市值)的因子值最小。有三种算法:\n\n1. **回归法**(参考 Barra CNE5):\n   - 在每个截面上,把 lnSize³ 对 lnSize 回归,**必须带截距项**,即 lnSize³ = α + β·lnSize + ε。\n   - 取残差的**相反数**作为因子。\n   - 带截距项时,残差对对数市值画出来是开口向下的抛物线。不带截距项就看不出这个形状。\n   - Barra CNE5 用最小加权二乘回归。报告的示例没有说明所用权重。\n2. **平方法**:\n   - 先把 lnSize 做 z-score,即减去全市场均值再除以标准差。\n   - 再取平方,最后取**相反数**。\n   - 它与回归法的相关系数是 0.87。在标准化市值大于 0 和小于 0 的两段内,相关系数各为 0.99。\n   - 两者的差别主要在尺度:平方法的因子标准差更小,回归法的跨度更大。\n3. **Menchero(2010)的方法**:先标准化 lnSize,再把标准化后的立方对标准化后的值回归,取残差。报告认为这实质上是前两种方法的结合,结果与它们无明显区别。\n\n**A股的实证结果**(回测区间 2006.1.25 至 2019.3,数字以全文为准)\n\n- 非线性规模纯因子组合历年收益均为负,波动明显小于规模纯因子。\n- 按因子值分 10 组,D0 为多头,D9 为空头。多头月均超额收益 0.96%,空头 -0.68%。\n- 因子 Rank IC 均值为 -5.38%,t 值为 -6.00。\n- 多空对冲组合年化收益 22.16%,年化波动 8.17%,年化 IR 2.71,最大回撤 21.2%。全文摘要里写的 IR 是 2.17,与正文 2.71 不一致,我引用的是正文和结论部分的 2.71。\n- Fama-MacBeth 检验中,该因子的风险溢价显著为负,t 值为 -4.99。已有因子解释不了这个溢价。因子值越高,股票未来收益越低。\n- 因子在 2017 年有明显回撤,2018 年之后又持续有效。\n- 中证1000成分股并不是全市场市值最小的那部分股票,它的非线性规模暴露与中证500相当。\n\n**检索说明:** 候选卡片里,20190423_财通证券_1e79c0(纯行业因子组合)只是在方法标签里提到\"非线性规模\",正文没有相关内容,判定为不相关。\n\n{\"relevant_ids\": [\"20190409_财通证券_94d3f3\"], \"answer\": \"A股不存在中市值效应:非线性规模纯因子历年收益为负,Rank IC为-5.38%,Fama-MacBeth t值为-4.99,中市值股票并不能跑赢大小市值股票,经常跑输。计算方法有三种:①回归法,把lnSize³对lnSize回归(必须带截距项),取残差的相反数;②平方法,把lnSize做z-score后取平方,再取相反数;③Menchero法,先标准化lnSize,再用标准化后的立方对其回归取残差。前两种方法在本质上无区别,相关系数为0.87。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q9": {
+    "lang": "traditional",
+    "q": "怎麼利用市場參與者之間看法不一致的程度來建構選股因子？",
+    "relevant_ids": [
+      "20240615_华泰证券_5a7a4f"
+    ],
+    "answer": "用多个模型模拟投资者的不同预测,以预测值的截面标准差作为分歧度因子,分歧越大未来收益越低(Miller 效应)。具体做法:训练 50 个 LightGBM,每个随机取 20 个特征(共 43 个),预测未来 10 日收益,对同一股票的 50 个预测取标准差,再做去极值、行业市值中性化和标准化。该因子 RankIC 均值 7.66%,TOP 组合年化超额收益 9.71%。在机构持股低(做空受限)的股票池里,多空组合年化收益从 32.89% 升到 54.05%。与预测均值构成的认可度因子等权合成后,RankIC 为 9.02%。局限是换手率高、未计成本,且在做空容易的股票上效果减弱。",
+    "parse_error": false,
+    "num_turns": 5,
+    "peak_context_tokens": 13764,
+    "usage": {
+      "input_tokens": 8,
+      "cache_creation_input_tokens": 8991,
+      "cache_read_input_tokens": 29156,
+      "output_tokens": 2060,
+      "output_tokens_details": {
+        "thinking_tokens": 61
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 8991,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1376,
+          "cache_read_input_tokens": 10535,
+          "cache_creation_input_tokens": 3227,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 3227
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.0594956,
+    "seconds": 24.9,
+    "raw_result": "知识库里只有一篇研报实质相关:华泰证券《人工智能系列之 80:机器学习用于模拟投资者分歧》(20240615_华泰证券_5a7a4f)。我先用分歧、dispersion、disagreement 等关键词搜了 `cards/`,只命中这一张。再按 `catalog.jsonl` 补搜分歧、一致预期、换手、预期差等词,也只命中它,所以没有其他候选需要判定。\n\n**核心思路**:Miller(1977)认为,投资者分歧大时,乐观者推高股价,悲观者因做空受限而难以施加影响,股价于是被高估,未来收益下降。所以分歧度越高,预期收益越低,可以作为负向选股因子。\n\n**构建步骤**(来源:20240615_华泰证券_5a7a4f):\n1. 样本取全 A 股,剔除 ST、停牌和涨停。准备 43 个截面特征,涵盖估值、成长、财务质量、量价和一致预期。\n2. 训练 50 个 LightGBM 模型来模拟不同投资者。每个模型随机抽取 20 个特征,以模仿投资者接收到不同的信息源。预测目标是未来 10 个交易日收益。\n3. 对同一天的同一只股票,取 50 个预测值的标准差,作为\"机器学习分歧度因子\"。\n4. 做去极值、行业市值中性化和标准化,再做 5 层分层回测和 IC 分析。\n5. 可以再取 50 个预测值的均值,作为\"认可度因子\"。两者等权合成复合因子。\n\n**实证结果**(以全文为准,回测期 2017/1/4~2024/5/31,周频):\n- 先用现有深度学习因子构建分歧度因子:RankIC 均值 6.06%,TOP 组合年化超额收益 9.75%,周频双边换手率 117.70%。\n- 改用 LightGBM 的机器学习分歧度因子后:RankIC 均值 7.66%,TOP 组合年化超额收益 9.71%,换手率降到 61.97%。\n- **做空限制**:用机构持股比例衡量做空难易。在机构持股低的股票池里,多空组合年化收益从 32.89% 升到 54.05%,RankIC 为 9.66%。\n- **近期涨幅**:在近期涨幅最大的股票池里,多空组合年化收益达 63.04%。\n- **复合因子**:与认可度因子等权合成后,RankIC 为 9.02%,TOP 组合年化超额收益为 13.07%。一致看多的组合收益最高,\"争议看空\"的组合收益最低。\n\n**局限**:\n- 回测未计交易成本,换手率偏高。\n- 多模型集成有过拟合风险。\n- 特征是随机抽取的,经济学解释的稳健性不足。\n- 在机构持股高(做空容易)的股票池里,因子效果明显减弱。\n\n卡片的\"关键结果\"表把 6.06% 和 9.75% 写成了 7.66% 和 9.71%,指标对应有误。上面的数字已按全文核对。\n\n{\"relevant_ids\": [\"20240615_华泰证券_5a7a4f\"], \"answer\": \"用多个模型模拟投资者的不同预测,以预测值的截面标准差作为分歧度因子,分歧越大未来收益越低(Miller 效应)。具体做法:训练 50 个 LightGBM,每个随机取 20 个特征(共 43 个),预测未来 10 日收益,对同一股票的 50 个预测取标准差,再做去极值、行业市值中性化和标准化。该因子 RankIC 均值 7.66%,TOP 组合年化超额收益 9.71%。在机构持股低(做空受限)的股票池里,多空组合年化收益从 32.89% 升到 54.05%。与预测均值构成的认可度因子等权合成后,RankIC 为 9.02%。局限是换手率高、未计成本,且在做空容易的股票上效果减弱。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  },
+  "q10": {
+    "lang": "simplified",
+    "q": "有没有微盘股择时或风险预警的模型？用了哪些预警指标？",
+    "relevant_ids": [
+      "20240526_国金证券_e392a7",
+      "20240506_国金证券_b61ef7",
+      "20240512_国金证券_35a947",
+      "20240429_国金证券_769662"
+    ],
+    "answer": "有。国金证券2024年量化观市周报提到微盘择时模型,用2个中期风险预警指标:十年国债利率同比(风控阈值0.3,读数-20.45%,未触发)和波动率拥挤度同比(4月15日升破阈值,触发预警)。另配合微盘股/茅指数相对净值年均线和20日收盘价斜率做风格轮动判断。报告只做监控提示,未披露模型构建细节和回测结果,也没有给出拥挤度阈值。",
+    "parse_error": false,
+    "num_turns": 8,
+    "peak_context_tokens": 22906,
+    "usage": {
+      "input_tokens": 10,
+      "cache_creation_input_tokens": 18133,
+      "cache_read_input_tokens": 46245,
+      "output_tokens": 1885,
+      "output_tokens_details": {
+        "thinking_tokens": 26
+      },
+      "server_tool_use": {
+        "web_search_requests": 0,
+        "web_fetch_requests": 0
+      },
+      "service_tier": "standard",
+      "cache_creation": {
+        "ephemeral_1h_input_tokens": 18133,
+        "ephemeral_5m_input_tokens": 0
+      },
+      "inference_geo": "global",
+      "iterations": [
+        {
+          "input_tokens": 2,
+          "output_tokens": 1022,
+          "cache_read_input_tokens": 18845,
+          "cache_creation_input_tokens": 4059,
+          "cache_creation": {
+            "ephemeral_5m_input_tokens": 0,
+            "ephemeral_1h_input_tokens": 4059
+          },
+          "type": "message"
+        }
+      ],
+      "speed": "standard",
+      "fallback_credit": null
+    },
+    "cost_usd_api_equiv": 0.09602649999999999,
+    "seconds": 25.2,
+    "raw_result": "有。知识库里有 4 篇国金证券 2024 年的量化观市周报,都在“微盘股指数择时与轮动指标监控”一节里讲了微盘择时模型。它们只是监控和提示,没有给出模型构建的细节。\n\n**微盘择时模型的两个中期风险预警指标**(全文原文,四篇表述一致):\n1. **十年国债利率同比指标**:偏基本面。报告里的读数是 -20.45%,风控阈值为 0.3,所以没有触发。\n2. **波动率拥挤度同比指标**:偏市场交易情绪。4 月 15 日重新升到阈值之上,触发预警。该指标在各期报告中的读数如下:\n\n| 截止日期 | 读数 |\n|---|---|\n| 4 月 26 日 | 0.8866 |\n| 4 月 30 日 | 0.7546 |\n| 5 月 10 日 | 0.7588 |\n| 5 月 24 日 | 0.9804 |\n\n全文没有给出这个指标的阈值,也没有说明它的计算方法。\n\n**配套的风格轮动信号**:\n- 看“微盘股/茅指数”相对净值有没有下穿年均线。4 月 15 日触发了下穿。\n- 看微盘股与茅指数各自的 20 日收盘价斜率。两者都为负,所以报告更看好茅指数。\n\n**报告的结论**:只有波动率拥挤度一个指标触发风控,所以长期持有微盘风格的投资者可以继续持有,但要注意短期风险。\n\n**局限**:\n- 这几篇是周报点评,卡片标注的价值等级为 low 或 medium。\n- 报告没有披露这个微盘择时模型的回测结果和具体构建规则。\n- 想复现的话,需要去找国金证券这个系列里专门讲该模型的报告。\n\n来源卡片:20240429_国金证券_769662、20240506_国金证券_b61ef7、20240512_国金证券_35a947、20240526_国金证券_e392a7。\n\n其余命中“小市值”的 20190409_财通证券_94d3f3、20190702_财通证券_8a9283、20191029_财通证券_e9da28 讨论的是规模因子,与微盘择时或预警无关,已判为不相关。\n\n{\"relevant_ids\": [\"20240526_国金证券_e392a7\", \"20240506_国金证券_b61ef7\", \"20240512_国金证券_35a947\", \"20240429_国金证券_769662\"], \"answer\": \"有。国金证券2024年量化观市周报提到微盘择时模型,用2个中期风险预警指标:十年国债利率同比(风控阈值0.3,读数-20.45%,未触发)和波动率拥挤度同比(4月15日升破阈值,触发预警)。另配合微盘股/茅指数相对净值年均线和20日收盘价斜率做风格轮动判断。报告只做监控提示,未披露模型构建细节和回测结果,也没有给出拥挤度阈值。\"}",
+    "recall": 1.0,
+    "missed": [],
+    "false_positives": []
+  }
+}
