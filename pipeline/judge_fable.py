@@ -112,6 +112,50 @@ def run_fable(prompt, schema, effort, wait, max_waits, model="claude-fable-5-2",
         return res, (p.stdout + "\n" + p.stderr)[-3000:], secs
 
 
+# DeepSeek 離峰價（USD / 百萬 token；第三方整理，2026-09～10，未經官方確認）；尖峰為 2 倍
+DEEPSEEK_PRICE = {"deepseek-flash": (0.15, 0.60), "deepseek-v4-pro": (0.66, 1.98)}
+SUBMIT_HINT = "\n\n---\n完成后，调用 `submit` 工具提交结果（参数必须符合工具的 schema），不要在正文输出结果。"
+
+
+def run_deepseek(prompt, schema, effort, model, attempts=3):
+    """DeepSeek 的 Anthropic 相容端點。沒有 structured output，改用工具呼叫取 JSON，再用 jsonschema 驗證。"""
+    import anthropic
+    import jsonschema
+    from common import load_env
+    client = anthropic.Anthropic(base_url="https://api.deepseek.com/anthropic",
+                                 api_key=load_env()["DEEPSEEK_API_KEY"], timeout=3600, max_retries=3)
+    tool = {"name": "submit", "description": "提交审核结果", "input_schema": schema}
+    t0, log, total = time.time(), [], {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}
+    for i in range(attempts):
+        with client.messages.stream(model=model, max_tokens=64000, tools=[tool], tool_choice={"type": "auto"},
+                                    messages=[{"role": "user", "content": prompt + SUBMIT_HINT}],
+                                    extra_body={"output_config": {"effort": effort}}) as st:
+            r = st.get_final_message()
+        u = r.usage
+        total["input_tokens"] += u.input_tokens + (u.cache_read_input_tokens or 0)
+        total["output_tokens"] += u.output_tokens
+        total["thinking_tokens"] += getattr(u.output_tokens_details, "thinking_tokens", 0) or 0
+        calls = [b.input for b in r.content if b.type == "tool_use" and b.name == "submit"]
+        if not calls:
+            log.append(f"attempt {i + 1}: 沒有呼叫 submit（stop_reason={r.stop_reason}）")
+            continue
+        try:
+            jsonschema.validate(calls[0], schema)
+        except jsonschema.ValidationError as e:
+            log.append(f"attempt {i + 1}: schema 不符：{e.message[:300]} @ {list(e.absolute_path)}")
+            continue
+        break
+    else:
+        calls = [None]
+    pin, pout = DEEPSEEK_PRICE.get(model, (0, 0))
+    cost = round(total["input_tokens"] / 1e6 * pin + total["output_tokens"] / 1e6 * pout, 5)
+    res = {"structured_output": calls[0], "usage": total, "total_cost_usd": cost,
+           "is_error": calls[0] is None, "num_turns": len(log) + (calls[0] is not None),
+           "stop_reason": r.stop_reason, "retry_log": log,
+           "utc_time": time.strftime("%Y-%m-%d %H:%M %a", time.gmtime())}
+    return res, "\n".join(log), round(time.time() - t0, 1)
+
+
 def set_path(card, path, value):
     """path 例：key_results.0.value、methods.1、core_idea"""
     keys = [int(k) if k.isdigit() else k for k in path.split(".")]
@@ -150,7 +194,10 @@ def call_and_save(d, name, prompt, schema, args):
         print(f"  skip {name}", flush=True)
         return json.loads((d / f"{name}.json").read_text())
     (d / f"{name}.prompt.md").write_text(prompt)
-    res, tail, secs = run_fable(prompt, schema, args.effort, args.wait, args.max_waits, args.model, args.no_cache)
+    if args.model.startswith("deepseek"):
+        res, tail, secs = run_deepseek(prompt, schema, args.effort, args.model)
+    else:
+        res, tail, secs = run_fable(prompt, schema, args.effort, args.wait, args.max_waits, args.model, args.no_cache)
     meta = {"seconds": secs, "prompt_chars": len(prompt), "effort": args.effort,
             "model": args.model, "no_cache": args.no_cache}
     if res:
