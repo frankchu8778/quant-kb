@@ -1,0 +1,59 @@
+# 策略大類（草稿 v0）——卡片的粗分類主軸
+# 判斷原則：這篇研報的思路「最可能被借用到哪類策略」。
+# strategy_types 可多選；primary_strategy_type 選一個。
+# 細的方法標籤仍用 vocab.yaml 的 methods。
+
+strategy_types:
+  trend-following:
+    zh: 趋势跟踪
+    definition: 押注价格延续，顺势交易（时序动量、CTA、突破、均线）
+    boundary: 横截面动量因子（选股）归 multi-factor
+  mean-reversion:
+    zh: 均值回归
+    definition: 押注单一资产价格偏离后回归，反向交易（短期反转择时、超买超卖）
+    boundary: 两个或多个资产之间的价差回归归 arbitrage
+  arbitrage:
+    zh: 套利
+    definition: 利用相关资产或同一资产在不同市场/合约间的定价差（期现、跨期、跨品种、统计套利、ETF 折溢价）
+    boundary: 依赖事件触发的价差（如指数调样）同时标 event-driven
+  multi-factor:
+    zh: 多因子
+    definition: 横截面选股、排序与组合构建，含指数增强；服务多因子流程的工具方法（因子预处理、因子检验、风险模型、组合优化）也归此类
+    boundary: 只做单一资产或大盘的择时，归 timing-allocation
+  market-making:
+    zh: 做市
+    definition: 提供双边报价赚取价差，管理库存与逆向选择风险
+    boundary: ""
+  event-driven:
+    zh: 事件驱动
+    definition: 由特定事件触发的交易（指数调样、财报、业绩预告、解禁、分红、并购、回购）
+    boundary: ""
+  timing-allocation:
+    zh: 择时与资产配置
+    definition: 市场整体或大类资产层级的仓位与配置决策（宏观、情绪、估值择时、风险平价）
+    boundary: 周报里顺带给出的配置建议，若没有可实现的方法，归 market-view
+  market-view:
+    zh: 市场观点
+    definition: 周报、市场点评、数据更新，没有可借用的新方法
+    boundary: ""
+  other:
+    zh: 其他
+    definition: 不属于上述任何一类（如基金/量化产品分析、监管与行业研究）
+    boundary: 请在 classification_notes 写明为何不属于其他类
+
+frequency:   # 策略的调仓/持仓频率；原文不明确就选 unspecified
+  - high-frequency   # 秒级、tick 级
+  - intraday         # 日内
+  - daily            # 日频
+  - weekly-or-longer # 周频、月频及以上
+  - unspecified
+
+asset_class:  # 可多选
+  - a-share
+  - stock-index-futures
+  - commodity-futures
+  - options
+  - bonds
+  - funds
+  - multi-asset
+  - other

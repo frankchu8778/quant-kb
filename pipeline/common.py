@@ -69,10 +69,16 @@ def card_schema(vocab):
     return obj(props)
 
 
-def build_prompt(vocab, filename, fulltext, template="card_prompt.md"):
+def vocab_blocks(vocab):
+    """詞彙表轉成 prompt 用的兩段文字：(方法大類, 方法詞彙表)。"""
     fams = "\n".join(f"- `{k}`：{v['zh']}" for k, v in vocab["families"].items())
     meths = "\n".join(f"- `{k}`：{v['zh']}（{v['family']}；{'、'.join(map(str, v['aliases']))}）"
                       for k, v in vocab["methods"].items())
+    return fams, meths
+
+
+def build_prompt(vocab, filename, fulltext, template="card_prompt.md"):
+    fams, meths = vocab_blocks(vocab)
     tpl = (PIPELINE / template).read_text()
     return (tpl.replace("{families}", fams).replace("{methods}", meths)
                .replace("{filename}", filename).replace("{fulltext}", fulltext))
