@@ -1,4 +1,4 @@
-"""用 Claude Fable 5.2 審核卡片（流程見 judge/README.md）。
+"""用 Claude（預設 Fable 5.2，可用 --model 換 Opus 等）審核卡片（流程見 judge/README.md）。
 
 用法：
   python judge_fable.py --only 20190702_财通证券_8a9283      # 試跑 1 篇
@@ -11,6 +11,7 @@
 """
 import argparse
 import copy
+import os
 import json
 import random
 import subprocess
@@ -88,14 +89,15 @@ def pass2_schema():
     })
 
 
-def run_fable(prompt, schema, effort, wait, max_waits):
-    cmd = ["claude", "-p", "--model", "claude-fable-5-2", "--effort", effort,
+def run_fable(prompt, schema, effort, wait, max_waits, model="claude-fable-5-2", no_cache=False):
+    env = os.environ | ({"DISABLE_PROMPT_CACHING": "1"} if no_cache else {})
+    cmd = ["claude", "-p", "--model", model, "--effort", effort,
            "--tools", "", "--system-prompt", "", "--strict-mcp-config",
            "--no-session-persistence", "--output-format", "json",
            "--json-schema", json.dumps(schema, ensure_ascii=False)]
     for attempt in range(max_waits + 1):
         t0 = time.time()
-        p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=3600)
+        p = subprocess.run(cmd, input=prompt, capture_output=True, text=True, timeout=3600, env=env)
         secs = round(time.time() - t0, 1)
         try:
             res = json.loads(p.stdout)
@@ -148,8 +150,9 @@ def call_and_save(d, name, prompt, schema, args):
         print(f"  skip {name}", flush=True)
         return json.loads((d / f"{name}.json").read_text())
     (d / f"{name}.prompt.md").write_text(prompt)
-    res, tail, secs = run_fable(prompt, schema, args.effort, args.wait, args.max_waits)
-    meta = {"seconds": secs, "prompt_chars": len(prompt), "effort": args.effort}
+    res, tail, secs = run_fable(prompt, schema, args.effort, args.wait, args.max_waits, args.model, args.no_cache)
+    meta = {"seconds": secs, "prompt_chars": len(prompt), "effort": args.effort,
+            "model": args.model, "no_cache": args.no_cache}
     if res:
         meta.update(total_cost_usd_api_equiv=res.get("total_cost_usd"), usage=res.get("usage"),
                     model_usage=res.get("modelUsage"), is_error=res.get("is_error"),
@@ -172,6 +175,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--effort", default="high")
+    ap.add_argument("--model", default="claude-fable-5-2")
+    ap.add_argument("--out", default="eval/fable", help="輸出資料夾（相對 KB）")
+    ap.add_argument("--no-cache", action="store_true", help="關閉 prompt 快取（每篇只讀一次，快取寫入是白花的）")
     ap.add_argument("--seed", default="fable-judge-v1")
     ap.add_argument("--canaries", default="eval/fable/_canaries.json")
     ap.add_argument("--wait", type=int, default=900, help="撞到額度限制時等待秒數")
@@ -187,8 +193,9 @@ def main():
     canaries_path = KB / args.canaries
     canaries = json.loads(canaries_path.read_text()) if canaries_path.exists() else []
 
-    OUT.mkdir(parents=True, exist_ok=True)
-    mapping_path = OUT / "_mapping.json"
+    out_root = KB / args.out
+    out_root.mkdir(parents=True, exist_ok=True)
+    mapping_path = out_root / "_mapping.json"
     mapping = json.loads(mapping_path.read_text()) if mapping_path.exists() else {}
     mds = sorted(SRC.glob("*.md"))
     if args.only:
@@ -196,7 +203,7 @@ def main():
     for md in mds:
         rid = md.stem
         print(f"== {rid}", flush=True)
-        d = OUT / rid
+        d = out_root / rid
         d.mkdir(exist_ok=True)
         fulltext = md.read_text()
         try:
