@@ -126,32 +126,42 @@ def run_deepseek(prompt, schema, effort, model, attempts=3):
                                  api_key=load_env()["DEEPSEEK_API_KEY"], timeout=3600, max_retries=3)
     tool = {"name": "submit", "description": "提交审核结果", "input_schema": schema}
     t0, log, total = time.time(), [], {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}
+    messages = [{"role": "user", "content": prompt + SUBMIT_HINT}]
+    last_bad = None
     for i in range(attempts):
         with client.messages.stream(model=model, max_tokens=64000, tools=[tool], tool_choice={"type": "auto"},
-                                    messages=[{"role": "user", "content": prompt + SUBMIT_HINT}],
+                                    messages=messages,
                                     extra_body={"output_config": {"effort": effort}}) as st:
             r = st.get_final_message()
         u = r.usage
         total["input_tokens"] += u.input_tokens + (u.cache_read_input_tokens or 0)
         total["output_tokens"] += u.output_tokens
         total["thinking_tokens"] += getattr(u.output_tokens_details, "thinking_tokens", 0) or 0
-        calls = [b.input for b in r.content if b.type == "tool_use" and b.name == "submit"]
-        if not calls:
+        uses = [b for b in r.content if b.type == "tool_use" and b.name == "submit"]
+        if not uses:
             log.append(f"attempt {i + 1}: 沒有呼叫 submit（stop_reason={r.stop_reason}）")
+            messages = messages + [{"role": "assistant", "content": r.content},
+                                   {"role": "user", "content": "请调用 `submit` 工具提交完整结果。"}]
             continue
-        try:
-            jsonschema.validate(calls[0], schema)
-        except jsonschema.ValidationError as e:
-            log.append(f"attempt {i + 1}: schema 不符：{e.message[:300]} @ {list(e.absolute_path)}")
-            continue
-        break
+        calls = [uses[0].input]
+        errs = sorted(jsonschema.Draft202012Validator(schema).iter_errors(calls[0]), key=lambda e: list(e.absolute_path))
+        if not errs:
+            break
+        msg = "；".join(f"{list(e.absolute_path)}: {e.message[:200]}" for e in errs[:10])
+        log.append(f"attempt {i + 1}: schema 不符（{len(errs)} 處）：{msg}")
+        last_bad = calls[0]
+        # 把錯誤回給模型，讓它補正後重新提交（保留 thinking 與 tool_use 區塊，DeepSeek 要求）
+        messages = messages + [
+            {"role": "assistant", "content": r.content},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": uses[0].id, "is_error": True,
+                                          "content": f"提交的结果不符合 schema：{msg}。请修正后重新调用 submit，提交完整结果（所有必填字段）。"}]}]
     else:
         calls = [None]
     pin, pout = DEEPSEEK_PRICE.get(model, (0, 0))
     cost = round(total["input_tokens"] / 1e6 * pin + total["output_tokens"] / 1e6 * pout, 5)
     res = {"structured_output": calls[0], "usage": total, "total_cost_usd": cost,
            "is_error": calls[0] is None, "num_turns": len(log) + (calls[0] is not None),
-           "stop_reason": r.stop_reason, "retry_log": log,
+           "stop_reason": r.stop_reason, "retry_log": log, "last_invalid_submission": last_bad,
            "utc_time": time.strftime("%Y-%m-%d %H:%M %a", time.gmtime())}
     return res, "\n".join(log), round(time.time() - t0, 1)
 

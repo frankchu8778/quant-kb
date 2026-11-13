@@ -1,0 +1,245 @@
+{
+  "cards": {
+    "A": {
+      "issues": [
+        {
+          "field": "methods",
+          "type": "标签错误",
+          "severity": "major",
+          "card_says": "methods 含 \"dividend-point-estimation\"（分紅點位測算）",
+          "source_says": "原文完全沒有股指期貨分紅點位測算的內容，研究對象是多模型預測標準差構成的分歧度因子。這個標籤會讓搜尋分紅測算的 agent 誤命中本卡。",
+          "quote": "计算所有模型对同一交易日同只股票的预测值的标准差,构建机器学习分歧度因子。",
+          "section": "数据与方法"
+        },
+        {
+          "field": "methods",
+          "type": "标签错误",
+          "severity": "major",
+          "card_says": "methods 未包含 investor-disagreement",
+          "source_says": "整篇報告的主題就是模擬投資者分歧，investor-disagreement 是最核心的方法標籤，卻被漏標。",
+          "quote": "本文运用机器学习来模拟投资者分歧。将不同的特征集输入给多个机器学习模型",
+          "section": "总结"
+        },
+        {
+          "field": "core_idea / key_results",
+          "type": "遗漏要点",
+          "severity": "minor",
+          "card_says": "列出 10 個特徵時的 RankIC 8.15%，但只寫「用于检验…特征数量…的影响」，沒有說明方向",
+          "source_says": "原文明確指出：特徵越多，RankIC 與多頭收益越低；特徵過多時模型間難以產生分歧，這是方法成立的關鍵機制。",
+          "quote": "如果特征数量过多,投资者之间就难以产生预测分歧。",
+          "section": "特征数量"
+        },
+        {
+          "field": "summary / core_idea",
+          "type": "遗漏要点",
+          "severity": "minor",
+          "card_says": "只寫「难做空…的股票中更显著」，沒有提到效應主要來自空頭端，也沒有提到「爭議看空」組合收益最低",
+          "source_says": "原文強調在低機構持股股票池中，效應特別集中在空頭端；在分歧度 × 認可度的 25 宮格中，「爭議看空」組合收益最低。",
+          "quote": "在机构持股比例低的股票池中分歧度因子的多空表现更好,特别是空头端,说明做空限制是分歧度因子的坚实基础。",
+          "section": "做空限制"
+        }
+      ],
+      "scores": {
+        "faithfulness": 2,
+        "core_idea": 2,
+        "method_borrowable": 2,
+        "key_results": 2,
+        "data_needed": 2,
+        "tags": 0
+      },
+      "borrower_test": {
+        "verdict": "correct",
+        "reason": "卡片內容涵蓋方法步驟、訓練設定、因子方向、條件分析與複合因子，數字也都正確，照著讀能正確理解並大致復現。主要問題在標籤：多標了無關的分紅測算，又漏標核心的投資者分歧，會影響卡片被檢索到的準確度。"
+      }
+    },
+    "B": {
+      "issues": [
+        {
+          "field": "summary / core_idea",
+          "type": "遗漏要点",
+          "severity": "major",
+          "card_says": "摘要寫「对预测周期、投资者数量、模型类型不敏感」，完全沒提特徵數量的影響",
+          "source_says": "原文指出特徵數量有一定影響：特徵越多，RankIC 與多頭收益越低；特徵過多時分歧會消失。10 個特徵時 RankIC 為 8.15%，是各設定中最高的。",
+          "quote": "特征数量对分歧度因子的回测表现具有一定影响。随机选取的特征数量越多,因子的RankIC 和多头收益越低,而换手率越高。",
+          "section": "特征数量"
+        },
+        {
+          "field": "methods",
+          "type": "标签错误",
+          "severity": "minor",
+          "card_says": "標了 agent-based-simulation",
+          "source_says": "原文只是把每個 LightGBM 當成一位「投資者」各自預測，沒有讓多個主體互動形成價格的市場模擬，與多主體模擬的一般含義不符。另外，卡片步驟裡寫了去極值與標準化，卻沒有標 outlier-treatment / standardization。",
+          "quote": "模型采用 LightGBM,数量为 50 个,即模拟 50 位投资者的预测观点。",
+          "section": "数据与方法"
+        },
+        {
+          "field": "limitations",
+          "type": "过度推论",
+          "severity": "minor",
+          "card_says": "「回测区间仅为2017至2024年约7年，且模型默认超参、未做寻优，稳健性有待更长样本验证」，而且未標 [推断]",
+          "source_says": "原文只說使用預設超參數是為了節省運算時間，並沒有說穩健性需要更長樣本驗證。這是作者自己的推斷，卻寫得像原文的限制。",
+          "quote": "模型采用默认超参数,没有进行超参数寻优,以节省运算时间。",
+          "section": "数据与方法"
+        },
+        {
+          "field": "data_needed",
+          "type": "遗漏要点",
+          "severity": "minor",
+          "card_says": "只列行情、43 個特徵、機構持股、深度學習因子",
+          "source_says": "中性化需要行業分類與市值；股票池需要 ST、停牌與漲停狀態；機構持股還需要季報披露時點，用來對齊滯後。",
+          "quote": "因子预处理:去极值、行业市值中性化、标准化。",
+          "section": "初步探索"
+        },
+        {
+          "field": "core_idea",
+          "type": "遗漏要点",
+          "severity": "minor",
+          "card_says": "只提「卖空限制和乐观投资者主导是…alpha 的来源」",
+          "source_says": "沒有提到效應集中在空頭端，也沒有提到「爭議看空」組合收益最低的發現。",
+          "quote": "然而收益最低的却不是投资者一致看空(认可度低,分歧度低)的股票组合,而是“争议看空”(认可度低,分歧度高)",
+          "section": "投资者认可度"
+        }
+      ],
+      "scores": {
+        "faithfulness": 1,
+        "core_idea": 2,
+        "method_borrowable": 2,
+        "key_results": 2,
+        "data_needed": 1,
+        "tags": 1
+      },
+      "borrower_test": {
+        "verdict": "correct",
+        "reason": "構造方式、負向使用、訓練設定與條件分析都寫對了，能正確理解思路。但它漏掉了「特徵子集要夠小才會產生分歧」的關鍵機制，借用者可能誤以為所有超參數都不敏感。"
+      }
+    },
+    "C": {
+      "issues": [
+        {
+          "field": "method_steps / summary / core_idea",
+          "type": "遗漏要点",
+          "severity": "critical",
+          "card_says": "全卡只寫「对股票未来收益具有显著预测能力」，沒有任何地方說明因子方向為負，也沒有寫回測前要做方向調整",
+          "source_says": "原文明確指出分歧度越高、未來收益越低，回測前要先做方向調整。只讀卡片的人可能把因子方向用反。",
+          "quote": "投资者分歧度越高,未来预期收益越低,因此在回测前先进行方向调整(下同)。",
+          "section": "初步探索"
+        },
+        {
+          "field": "method_steps",
+          "type": "遗漏要点",
+          "severity": "major",
+          "card_says": "只寫「如50个LightGBM」「如20个」、預測未來 10 日收益",
+          "source_says": "原文有明確的訓練設定：預設超參數、每年重訓一次、使用過去 6 年資料、按 7:3 劃分訓練集與驗證集。卡片全部漏寫，無法對齊原文結果。",
+          "quote": "模型每年重新训练一次,每次训练使用过去 6 年数据,按照 7:3 比例划分训练集和验证集。",
+          "section": "数据与方法"
+        },
+        {
+          "field": "key_results",
+          "type": "遗漏要点",
+          "severity": "minor",
+          "card_says": "沒有列出認可度因子與複合因子的數字，也沒有特徵數量敏感性的結果",
+          "source_says": "複合因子 RankIC 9.02%、TOP 年化超額 13.07%，認可度因子 RankIC 8.34%；特徵過多時分歧會消失。",
+          "quote": "如果特征数量过多,投资者之间就难以产生预测分歧。",
+          "section": "特征数量"
+        },
+        {
+          "field": "core_idea",
+          "type": "其他",
+          "severity": "minor",
+          "card_says": "「创新性地使用多个树模型随机选取不同特征子集进行训练」",
+          "source_says": "原文說明這套做法借鑑自 Bali 等（2023）的 MFD 研究，並非本文首創。「創新性地」屬於評價性措辭，而且不準確。",
+          "quote": "本篇报告借鉴 Bali 等(2023)的研究,运用机器学习来模拟投资者分歧。",
+          "section": "机器学习模拟投资者分歧"
+        },
+        {
+          "field": "data_needed",
+          "type": "遗漏要点",
+          "severity": "minor",
+          "card_says": "只籠統寫「日频行情、财务报表、一致预期、机构持股、股票池信息」",
+          "source_says": "沒有寫出 43 個截面特徵的類別結構、中性化所需的行業與市值、ST/停牌/漲停狀態，也沒有寫機構持股的季報滯後規則。",
+          "quote": "1~4 月份用去年三季报数据,5~8 月份用一季报数据,9~10 月份用半年报数据,11~12 月份用三季报数据。",
+          "section": "做空限制"
+        },
+        {
+          "field": "families",
+          "type": "标签错误",
+          "severity": "minor",
+          "card_says": "families 沒有 factor-preprocessing，但 methods 標了 neutralization / standardization / outlier-treatment",
+          "source_says": "原文確有因子預處理步驟，大類與方法標籤前後不一致。",
+          "quote": "因子预处理:去极值、行业市值中性化、标准化。",
+          "section": "初步探索"
+        }
+      ],
+      "scores": {
+        "faithfulness": 1,
+        "core_idea": 1,
+        "method_borrowable": 0,
+        "key_results": 1,
+        "data_needed": 1,
+        "tags": 1
+      },
+      "borrower_test": {
+        "verdict": "partial",
+        "reason": "能理解「多模型隨機特徵 → 預測標準差 = 分歧」的大方向，但卡片沒寫因子為負向，也缺少訓練窗口與重訓設定，照著做可能把方向用反，也無法對齊原文結果。"
+      }
+    }
+  },
+  "ranking": {
+    "order": [
+      "A",
+      "B",
+      "C"
+    ],
+    "reason": "A 的內容最完整也最準確：步驟、訓練設定、方向調整、資料需求、條件分析與複合因子數字都齊全，問題集中在標籤（誤標 dividend-point-estimation、漏標 investor-disagreement）。B 的內容同樣正確，還多了相關性結果，但漏掉特徵數量的關鍵機制，資料需求也不完整，限制裡有一條未標註的推斷。C 沒寫因子方向為負（critical），訓練設定也缺失，數字較少，用詞還帶評價。"
+  },
+  "must_capture_coverage": [
+    {
+      "point": "分歧度＝多模型預測值的截面標準差，因子方向為負，回測前須做方向調整",
+      "A": "covered",
+      "B": "covered",
+      "C": "missing"
+    },
+    {
+      "point": "每個模型從 43 個特徵中隨機選 20 個，模擬差異化資訊源；特徵過多時分歧消失，10 個特徵的 RankIC 最高",
+      "A": "partial",
+      "B": "partial",
+      "C": "partial"
+    },
+    {
+      "point": "50 個 LightGBM、預設超參數、預測 10 日收益、每年重訓、使用過去 6 年資料、7:3 劃分",
+      "A": "covered",
+      "B": "covered",
+      "C": "partial"
+    },
+    {
+      "point": "做空限制是經濟基礎：低機構持股股票的多空收益更強，且主要來自空頭端；近期上漲股票的效應也更強",
+      "A": "partial",
+      "B": "partial",
+      "C": "partial"
+    },
+    {
+      "point": "預測均值構成認可度因子（正向），與分歧度等權合成後效果更好；「爭議看空」組合收益最低",
+      "A": "partial",
+      "B": "partial",
+      "C": "partial"
+    }
+  ],
+  "reference_corrections": "笔记大致正確，有一處需要修正：reference 的 summary 寫「超参数敏感性不大」，但原文明確指出特徵數量「具有一定影响」（特徵越多，RankIC 與多頭收益越低），只有預測週期、投資者數量與模型類型的影響才「接近／差异不大」。建議改為「除特徵數量外，超參數敏感性不大」。笔记說深度學習分歧度因子「基于8个已有深度学习因子」，原文有依據（「投资者数量过少(8个深度学习因子)」），保留即可。",
+  "conversion_issues": [
+    {
+      "location": "图表2、图表6、图表10、图表35",
+      "problem": "表格轉換後嚴重殘缺：例如 RankIC 均值顯示成「.66%」「.06%」，欄位錯位，大部分數值遺失（深度學習分歧度因子的 IC_IR、TOP 信息比等）。",
+      "impact": "卡片作者只能依賴摘要與總結段落裡的 6.06%、9.75%、117.70% 等數字，無法取得深度學習因子的完整指標。認可度因子的完整指標可以從图表42補回，三張卡片都沒有因此出錯。"
+    },
+    {
+      "location": "图表16",
+      "problem": "表頭合併成一格，部分列的「TOP 组合信息比率」與「胜率」擠在同一儲存格，欄位對不齊。",
+      "impact": "讀取 25 / 100 個投資者的數字容易錯位；三張卡片都沒引用這張表，沒有受到影響。"
+    },
+    {
+      "location": "图表19 标题",
+      "problem": "標題寫成「不同投资者数量的分歧度因子…」，但內容其實是 10 / 20 / 30 個特徵的比較，這是原文的筆誤。",
+      "impact": "可能讓讀者把特徵數量的結果誤當成投資者數量的結果；卡片 A 引用 10 個特徵的數據時對應正確，沒有受到影響。"
+    }
+  ]
+}
