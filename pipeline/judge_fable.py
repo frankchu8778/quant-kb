@@ -117,6 +117,17 @@ DEEPSEEK_PRICE = {"deepseek-flash": (0.15, 0.60), "deepseek-v4-pro": (0.66, 1.98
 SUBMIT_HINT = "\n\n---\n完成后，调用 `submit` 工具提交结果（参数必须符合工具的 schema），不要在正文输出结果。"
 
 
+def lift_misnested(sub, schema):
+    """DeepSeek 常把最外層欄位（ranking 等）誤放進 cards 裡；只搬位置，不改內容。"""
+    top = set(schema.get("properties", {}))
+    cards = sub.get("cards") if isinstance(sub, dict) else None
+    if not isinstance(cards, dict):
+        return sub
+    for k in [k for k in cards if k in top and k != "cards" and k not in sub]:
+        sub[k] = cards.pop(k)
+    return sub
+
+
 def run_deepseek(prompt, schema, effort, model, attempts=3):
     """DeepSeek 的 Anthropic 相容端點。沒有 structured output，改用工具呼叫取 JSON，再用 jsonschema 驗證。"""
     import anthropic
@@ -143,7 +154,7 @@ def run_deepseek(prompt, schema, effort, model, attempts=3):
             messages = messages + [{"role": "assistant", "content": r.content},
                                    {"role": "user", "content": "请调用 `submit` 工具提交完整结果。"}]
             continue
-        calls = [uses[0].input]
+        calls = [lift_misnested(uses[0].input, schema)]
         errs = sorted(jsonschema.Draft202012Validator(schema).iter_errors(calls[0]), key=lambda e: list(e.absolute_path))
         if not errs:
             break

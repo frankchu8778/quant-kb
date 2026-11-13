@@ -1,0 +1,17 @@
+{
+  "seconds": 70.9,
+  "prompt_chars": 44515,
+  "effort": "high",
+  "model": "deepseek-flash",
+  "no_cache": false,
+  "total_cost_usd_api_equiv": 0.01238,
+  "usage": {
+    "input_tokens": 24483,
+    "output_tokens": 14515,
+    "thinking_tokens": 8139
+  },
+  "model_usage": null,
+  "is_error": false,
+  "num_turns": 1,
+  "stop_reason": "tool_use"
+}

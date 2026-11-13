@@ -1,0 +1,18 @@
+{
+  "seconds": 118.8,
+  "prompt_chars": 44798,
+  "effort": "high",
+  "model": "deepseek-flash",
+  "no_cache": false,
+  "total_cost_usd_api_equiv": 0.03389,
+  "usage": {
+    "input_tokens": 116347,
+    "output_tokens": 27404,
+    "thinking_tokens": 16161
+  },
+  "model_usage": null,
+  "is_error": true,
+  "num_turns": 3,
+  "stop_reason": "tool_use",
+  "error": "attempt 1: schema 不符（5 處）：[]: 'ranking' is a required property；[]: 'must_capture_coverage' is a required property；[]: 'reference_corrections' is a required property；[]: 'conversion_issues' is a required property；['cards']: Additional properties are not allowed ('conversion_issues', 'must_capture_coverage', 'ranking', 'reference_corrections' were unexpected)\nattempt 2: schema 不符（5 處）：[]: 'ranking' is a required property；[]: 'must_capture_coverage' is a required property；[]: 'reference_corrections' is a required property；[]: 'conversion_issues' is a required property；['cards']: Additional properties are not allowed ('conversion_issues', 'must_capture_coverage', 'ranking', 'reference_corrections' were unexpected)\nattempt 3: schema 不符（4 處）：[]: 'ranking' is a required property；[]: 'must_capture_coverage' is a required property；[]: 'reference_corrections' is a required property；[]: 'conversion_issues' is a required property"
+}

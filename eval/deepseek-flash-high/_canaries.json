@@ -1,0 +1,29 @@
+[
+  {
+    "id": "canary-number",
+    "rid": "20190507_财通证券_6dfdbf",
+    "engine": "sonnet-v2",
+    "path": "key_results.2.value",
+    "new": "0.93",
+    "kind": "數字：Newey-West 調整後相關係數，原文 0.99",
+    "original": "0.99"
+  },
+  {
+    "id": "canary-tag",
+    "rid": "20240615_华泰证券_5a7a4f",
+    "engine": "minimax-v2",
+    "path": "methods.0",
+    "new": "dividend-point-estimation",
+    "kind": "方法標籤：把主要方法 investor-disagreement 換成無關的分紅點位測算",
+    "original": "investor-disagreement"
+  },
+  {
+    "id": "canary-core-idea",
+    "rid": "nodate_unknown_9dbd98",
+    "engine": "qwen-v2-think",
+    "path": "core_idea",
+    "new": "将混沌理论中的粗糙熵与噪声估计引入交易，通过量化价格序列中的“噪声占比”(NTS)识别随机游走阶段，在噪声高（随机性强）且上午走势震荡时于午后反向建仓、押注价格回归，从而提升策略的胜率与风险收益比。",
+    "kind": "核心觀點方向改反：原為噪聲低時順勢做趨勢，改成噪聲高時反向做回歸",
+    "original": "将混沌理论中的粗糙熵与噪声估计引入趋势交易，通过量化价格序列中的“噪声占比”(NTS)来过滤随机游走阶段，仅在噪声低（人为/趋势性强）且上午已现单边形态时介入午后趋势，从而提升趋势跟踪策略的胜率与风险收益比。"
+  }
+]

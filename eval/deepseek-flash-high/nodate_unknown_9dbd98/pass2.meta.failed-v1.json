@@ -1,0 +1,18 @@
+{
+  "seconds": 212.6,
+  "prompt_chars": 44798,
+  "effort": "high",
+  "model": "deepseek-flash",
+  "no_cache": false,
+  "total_cost_usd_api_equiv": 0.03675,
+  "usage": {
+    "input_tokens": 71193,
+    "output_tokens": 43459,
+    "thinking_tokens": 32040
+  },
+  "model_usage": null,
+  "is_error": true,
+  "num_turns": 3,
+  "stop_reason": "tool_use",
+  "error": "attempt 1: schema 不符：'ranking' is a required property @ []\nattempt 2: schema 不符：'ranking' is a required property @ []\nattempt 3: schema 不符：'ranking' is a required property @ []"
+}

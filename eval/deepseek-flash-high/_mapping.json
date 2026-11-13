@@ -1,0 +1,22 @@
+{
+  "20190507_财通证券_6dfdbf": {
+    "A": "qwen-v2-think",
+    "B": "minimax-v2",
+    "C": "sonnet-v2"
+  },
+  "20190702_财通证券_8a9283": {
+    "A": "qwen-v2-think",
+    "B": "sonnet-v2",
+    "C": "minimax-v2"
+  },
+  "20240615_华泰证券_5a7a4f": {
+    "A": "minimax-v2",
+    "B": "sonnet-v2",
+    "C": "qwen-v2-think"
+  },
+  "nodate_unknown_9dbd98": {
+    "A": "minimax-v2",
+    "B": "sonnet-v2",
+    "C": "qwen-v2-think"
+  }
+}
