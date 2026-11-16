@@ -10,6 +10,7 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 |---|---|---|---|
 | 0 入庫 | `batch.py ingest <batch>` | 否 | 可用 |
 | 1 轉檔 | `batch.py convert <batch>` | 否（本機 GPU） | 可用，新批次還沒實跑過 MinerU |
+| 1a 重複性檢查 | `batch.py dedup <batch>` | 否 | 可用 |
 | 1b 品質閘 | `batch.py quality <batch>` | 否 | 可用 |
 | 2 去固定頁 | `batch.py clean <batch>` | 否 | 可用 |
 | — 預算確認 | `batch.py status <batch> --budget N` | 否 | 可用 |
@@ -31,6 +32,7 @@ python batch.py ingest batch1
 ```
 
 - 用檔案內容的雜湊去重，**跨批次**都算：同一份 PDF 換檔名再放一次，只會記在原紀錄的 `duplicates`。
+- **快篩**：直接抽 PDF 前兩頁的文字算指紋，和全庫比對。相似度 ≥ 90% 就 hold，不會進轉檔。抓的是「同一篇被加了浮水印或重新壓縮」。掃描版抽不到字，這一步會略過。
 - 檔名不符合格式的會列出來，id 會變成 `nodate_unknown_<雜湊>`。可以先改檔名再重跑。
 - 紀錄寫在 `catalog/manifest.json`，之後每個階段都更新同一筆。
 
@@ -49,6 +51,39 @@ python batch.py convert batch1
 - 預設 `--tier standard`，行內公式比 basic 乾淨，每篇約 33 秒。
 - 只處理還沒轉的篇，中斷後重跑即可。MinerU 沒有輸出的篇維持 `ingested`。
 - 原始輸出留在 `pipeline/_mineru_raw/<batch>/<tier>/`，不修改。
+
+### 1a. 重複性檢查
+
+```bash
+python batch.py dedup batch1
+```
+
+用轉檔後的全文和**全庫**（含之前所有批次）比對，相似度 ≥ 60% 就 hold。不看檔名，所以從不同網站抓到的同一篇也擋得住。
+
+- 相似度的算法：把文字只留中英文與數字，切成 5 個字的片段，算兩篇片段集合的重疊比例。浮水印、空白、標點、排版不影響。指紋存在 `catalog/fingerprints.json`。
+- 在 POC 的 20 篇上量到的數字（門檻在 `batch.py` 的 `DUP_FULL_THRESHOLD`）：
+
+  | 情況 | 相似度 |
+  |---|---|
+  | 同一篇，不同轉檔等級 | 97% |
+  | 同一篇，每段加浮水印 | 90% |
+  | 同一篇，少最後 10% | 84% |
+  | 同一篇，只有前半 | 55% |
+  | **不同研報裡最像的**（國金同系列的四期週報互相比） | 44–53% |
+  | 其餘不同研報 | 多數低於 10%，最高 39% |
+
+- 60% 離「同系列週報」只有 7 個百分點。模板更固定的週報系列可能會被擋下，這是預期中的：看一眼確認後放行即可。
+- 被擋下的是**後進來的那一篇**，先入庫的不動。
+
+### 被 hold 之後
+
+每個指令結束時會列出這次新擋下的篇和原因；`status` 會列出全部。確認不是問題的：
+
+```bash
+python batch.py release batch1 <id> [<id> ...]
+```
+
+會回到被擋下之前的階段繼續往下走，不會再被同一道檢查擋。放行紀錄留在 manifest 的 `released`。確定是重複的就不用處理，維持 hold 即可。
 
 ### 1b. 品質閘
 
@@ -111,7 +146,7 @@ python batch.py status batch1 --budget 300
 
 | 檔案 | 用途 |
 |---|---|
-| `batch.py` | 本機階段：入庫、轉檔、品質閘、去固定頁、狀態 |
+| `batch.py` | 本機階段：入庫、轉檔、重複性檢查、品質閘、去固定頁、狀態、放行 |
 | `clean.py` | 去固定頁的規則 |
 | `validate.py` | 程式硬檢查 `gate_v4`：schema、引文在全文、數字在同列引文 |
 | `card_prompt_v3.md` | 寫卡 prompt（每個方法步驟附引文與章節） |

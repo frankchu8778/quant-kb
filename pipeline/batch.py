@@ -3,15 +3,18 @@
 用法（<batch> 是 inbox/ 下的資料夾名稱，例如 batch1）：
   python batch.py ingest  <batch>                 # 階段 0：掃描 PDF、去重、寫進 manifest
   python batch.py convert <batch> [--tier standard] [--postprocess-only]   # 階段 1：MinerU（本機 GPU）
+  python batch.py dedup   <batch>                 # 階段 1a：全文相似度比對，疑似重複的標成 hold
   python batch.py quality <batch>                 # 階段 1b：轉檔品質閘，不合格的標成 hold
   python batch.py clean   <batch>                 # 階段 2：去固定頁
   python batch.py status  <batch> [--budget 300]  # 各階段篇數、hold 原因、寫卡與檢查的花費估算
+  python batch.py release <batch> <id> [<id> ...] # 人工確認後解除 hold，回到被擋下之前的階段
 
 每個指令都可以重跑：已完成的篇會跳過，只處理還沒做的。
 
 路徑：
   inbox/<batch>/*.pdf                       原始 PDF（不進 git）
   catalog/manifest.json                     每篇的狀態、來源檔、各階段結果（全庫共用，跨批次去重）
+  catalog/fingerprints.json                 每篇的內容指紋（全庫共用，跨批次比對重複）
   pipeline/_mineru_raw/<batch>/<tier>/      MinerU 原始輸出（不修改）
   fulltext/<batch>/<tier>/<id>.md           整理後的全文
   fulltext/<batch>/clean/<id>.md            去固定頁後的全文（寫卡用這份）
@@ -25,8 +28,10 @@ import json
 import os
 import re
 import subprocess
+import sys
 import time
 import unicodedata
+import zlib
 from pathlib import Path
 
 from clean import strip_repeated, strip_sections
@@ -46,6 +51,15 @@ MIN_CHARS = 2000             # 全文太短：轉檔失敗或只有封面
 MIN_CHARS_PER_PAGE = 150     # 每頁字數太少：多半是掃描版且 OCR 沒出字
 MIN_CJK_OR_LATIN_PCT = 30    # 中文加英文字母佔比太低：多半是表格或亂碼
 MAX_CHARS = 120_000          # POC 最長約 4 萬字；更長的還沒測過模型上限，先擋下來人工確認
+
+# 重複性檢查。相似度 = 兩篇文字的 5 字片段集合的重疊比例（Jaccard），用 MinHash 估計，誤差約 ±3 個百分點。
+DUP_FULL_THRESHOLD = 0.60    # 全文相似度達到就 hold（暫定，使用者指定）
+DUP_HEAD_THRESHOLD = 0.90    # 入庫快篩：PDF 前兩頁文字相似度。門檻較高，因為同系列研報的封面頁本來就很像
+HEAD_PAGES = 2
+MIN_HEAD_CHARS = 200         # 前兩頁抽不到這麼多字（掃描版）就不做快篩，留給全文比對
+SHINGLE = 5
+N_HASH = 256
+FINGERPRINTS = ROOT / "catalog" / "fingerprints.json"
 
 # 花費估算（人民幣）。token 量依試產 20 篇實測推算，只用來設預算，不是帳單。
 TOKENS_PER_CHAR = 0.45       # 全文每字約幾個 token（Kimi 與 DeepSeek 實測 0.41–0.46）
@@ -68,6 +82,78 @@ def save(m):
     tmp = MANIFEST.with_suffix(".tmp")
     tmp.write_text(json.dumps(m, ensure_ascii=False, indent=2))
     tmp.replace(MANIFEST)  # 原子替換，中斷時不會留下半個檔
+
+
+def norm_text(text):
+    """只留中文、英文字母、數字：浮水印位置、空白、標點、Markdown 語法的差異都不影響指紋。"""
+    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", unicodedata.normalize("NFKC", text))
+    return re.sub(r"[^0-9A-Za-z一-鿿]", "", text).lower()
+
+
+def minhash(text):
+    """回傳 N_HASH 個整數的指紋；文字太短回傳 None。"""
+    import numpy as np
+    s = norm_text(text)
+    if len(s) < SHINGLE + 20:
+        return None
+    # 每個 5 字片段取一個穩定的 32 位元雜湊（不用內建 hash()，它每次執行結果不同）
+    h = np.fromiter({zlib.crc32(s[i:i + SHINGLE].encode()) for i in range(len(s) - SHINGLE + 1)}, dtype=np.uint64)
+    # 固定種子：所有文件用同一組雜湊函數，指紋才能互相比較
+    seeds = np.random.default_rng(20261117).integers(0, 1 << 63, N_HASH, dtype=np.uint64)
+    with np.errstate(over="ignore"):  # 64 位元乘法刻意讓它溢位（splitmix64 混合）
+        z = h[None, :] + seeds[:, None]
+        z = (z ^ (z >> np.uint64(30))) * np.uint64(0xBF58476D1CE4E5B9)
+        z = (z ^ (z >> np.uint64(27))) * np.uint64(0x94D049BB133111EB)
+        sig = (z ^ (z >> np.uint64(31))).min(axis=1)
+    return [int(x) for x in sig]
+
+
+def similarity(sig_a, sig_b):
+    return sum(x == y for x, y in zip(sig_a, sig_b)) / N_HASH
+
+
+def load_fp():
+    return json.loads(FINGERPRINTS.read_text()) if FINGERPRINTS.exists() else {}
+
+
+def save_fp(fp):
+    FINGERPRINTS.parent.mkdir(parents=True, exist_ok=True)
+    tmp = FINGERPRINTS.with_suffix(".tmp")
+    tmp.write_text(json.dumps(fp))
+    tmp.replace(FINGERPRINTS)
+
+
+def nearest(sig, fp, kind, exclude):
+    """在指紋庫裡找最像的一篇，回傳 (相似度, id)。"""
+    best = (0.0, None)
+    for rid, v in fp.items():
+        if rid != exclude and v.get(kind):
+            sim = similarity(sig, v[kind])
+            if sim > best[0]:
+                best = (sim, rid)
+    return best
+
+
+def hold(v, reason):
+    """擋下一篇並記住它原本在哪個階段，release 時回得去。"""
+    v.update(hold_from=v["status"], status="hold", hold_reason=reason)
+
+
+def head_text(pdf):
+    """直接從 PDF 抽前幾頁的文字（不經過 MinerU，很快）。抽不到就回傳空字串。"""
+    try:
+        import pypdfium2
+        doc = pypdfium2.PdfDocument(str(pdf))
+        try:
+            out = []
+            for i in range(min(HEAD_PAGES, len(doc))):
+                tp = doc[i].get_textpage()
+                out.append(tp.get_text_range())
+            return "".join(out)
+        finally:
+            doc.close()
+    except Exception:
+        return ""
 
 
 def of_batch(m, batch):
@@ -94,6 +180,7 @@ def cmd_ingest(args):
     if not pdfs:
         raise SystemExit(f"{inbox} 沒有 PDF")
     new = dup = 0
+    fp, held = load_fp(), []
     for pdf in pdfs:
         sha = hashlib.sha1(pdf.read_bytes()).hexdigest()
         if sha in by_hash:
@@ -117,9 +204,20 @@ def cmd_ingest(args):
                   "ingested_at": time.strftime("%Y-%m-%d %H:%M")}
         by_hash[sha] = rid
         new += 1
+        # 快篩：檔案不同但前兩頁文字幾乎一樣（加浮水印、重新壓縮的同一篇），轉檔前就擋下
+        ht = head_text(pdf)
+        sig = minhash(ht) if len(norm_text(ht)) >= MIN_HEAD_CHARS else None
+        if sig:
+            sim, other = nearest(sig, fp, "head", rid)
+            fp.setdefault(rid, {})["head"] = sig
+            if sim >= DUP_HEAD_THRESHOLD:
+                hold(m[rid], f"疑似重複：前 {HEAD_PAGES} 頁與 {other}（{m[other]['source_pdf']}）相似度 {sim:.0%}")
+                held.append(rid)
     save(m)
+    save_fp(fp)
     b = of_batch(m, args.batch)
-    print(f"{args.batch}: 新增 {new} 篇，重複 {dup} 篇，本批共 {len(b)} 篇")
+    print(f"{args.batch}: 新增 {new} 篇，檔案完全相同的重複 {dup} 篇，本批共 {len(b)} 篇")
+    report_holds(m, held)
     bad = [v["source_pdf"] for v in b.values() if not v["name_parsed"]]
     if bad:
         print(f"檔名不符合「日期-券商-標題.pdf」的 {len(bad)} 篇（id 會是 nodate_unknown_*）：")
@@ -185,6 +283,58 @@ def cmd_convert(args):
     print(f"整理完成 {done} 篇；MinerU 沒有輸出 {miss} 篇（維持 ingested，可重跑 convert）")
 
 
+def report_holds(m, held):
+    """把新擋下的篇醒目地印出來（同時寫到 stderr，排程或背景執行時也看得到）。"""
+    if not held:
+        return
+    lines = [f"⚠️  有 {len(held)} 篇被擋下（hold），需要你確認："] + \
+            [f"   {rid}  {m[rid]['source_pdf'][:50]}\n      → {m[rid]['hold_reason']}" for rid in held] + \
+            ["   確認不是問題的，用 `python batch.py release <batch> <id>` 放行。"]
+    print("\n".join(lines))
+    print(f"HOLD {len(held)}", file=sys.stderr)
+
+
+def cmd_dedup(args):
+    m, fp, held, n = load(), load_fp(), [], 0
+    for rid, v in of_batch(m, args.batch).items():
+        if v["status"] != "converted":
+            continue
+        sig = minhash((ROOT / "fulltext" / args.batch / v["tier"] / f"{rid}.md").read_text())
+        n += 1
+        if sig is None:  # 幾乎沒有文字：交給品質閘處理
+            v["status"] = "deduped"
+            continue
+        sim, other = nearest(sig, fp, "full", rid)
+        fp.setdefault(rid, {})["full"] = sig  # 被擋下的也留指紋，第三份重複才比得到
+        v["dedup"] = {"nearest": other, "similarity": round(sim, 3)}
+        cleared = any(r["reason"].startswith("疑似重複") for r in v.get("released", []))  # 入庫快篩時已人工放行過
+        if sim >= DUP_FULL_THRESHOLD and not cleared:
+            hold(v, f"疑似重複：全文與 {other}（{m[other]['source_pdf']}）相似度 {sim:.0%}")
+            held.append(rid)
+        else:
+            v["status"] = "deduped"
+    save(m)
+    save_fp(fp)
+    print(f"重複性檢查 {n} 篇：通過 {n - len(held)} 篇，hold {len(held)} 篇（門檻 {DUP_FULL_THRESHOLD:.0%}）")
+    report_holds(m, held)
+
+
+def cmd_release(args):
+    m = load()
+    for rid in args.ids:
+        v = m.get(rid)
+        if not v or v["batch"] != args.batch or v["status"] != "hold":
+            print(f"略過 {rid}：不在批次 {args.batch} 或不是 hold")
+            continue
+        # 放行後往下一個階段走，不再被同一道檢查擋下
+        nxt = {"ingested": "ingested", "converted": "deduped", "deduped": "quality_ok"}[v["hold_from"]]
+        v.setdefault("released", []).append({"reason": v.pop("hold_reason"), "at": time.strftime("%Y-%m-%d %H:%M")})
+        v["status"] = nxt
+        del v["hold_from"]
+        print(f"放行 {rid} → {nxt}")
+    save(m)
+
+
 def quality_problems(text, pages):
     n = max(len(text), 1)
     garbled = 100 * len(GARBLED.findall(text)) / n
@@ -207,22 +357,22 @@ def quality_problems(text, pages):
 
 def cmd_quality(args):
     m = load()
-    held = ok = 0
+    held, ok = [], 0
     for rid, v in of_batch(m, args.batch).items():
-        if v["status"] != "converted":
+        if v["status"] != "deduped":
             continue
         text = (ROOT / "fulltext" / args.batch / v["tier"] / f"{rid}.md").read_text()
         stats, problems = quality_problems(text, v.get("pages"))
         v["quality"] = stats
         if problems:
-            v.update(status="hold", hold_reason="；".join(problems))
-            held += 1
-            print(f"hold  {rid}: {v['hold_reason']}")
+            hold(v, "轉檔品質：" + "；".join(problems))
+            held.append(rid)
         else:
             v["status"] = "quality_ok"
             ok += 1
     save(m)
-    print(f"品質閘：通過 {ok} 篇，hold {held} 篇")
+    print(f"品質閘：通過 {ok} 篇，hold {len(held)} 篇")
+    report_holds(m, held)
 
 
 def cmd_clean(args):
@@ -265,7 +415,7 @@ def cmd_status(args):
     b = of_batch(load(), args.batch)
     if not b:
         raise SystemExit(f"manifest 裡沒有批次 {args.batch}，先跑 ingest")
-    order = ["ingested", "converted", "quality_ok", "cleaned", "hold"]
+    order = ["ingested", "converted", "deduped", "quality_ok", "cleaned", "hold"]
     counts = {s: sum(v["status"] == s for v in b.values()) for s in order}
     print(f"批次 {args.batch}：共 {len(b)} 篇")
     for s in order:
@@ -291,12 +441,14 @@ def cmd_status(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["ingest", "convert", "quality", "clean", "status"]:
+    for name in ["ingest", "convert", "dedup", "quality", "clean", "status", "release"]:
         p = sub.add_parser(name)
         p.add_argument("batch")
         if name == "convert":
             p.add_argument("--tier", default="standard", choices=["basic", "standard"])
             p.add_argument("--postprocess-only", action="store_true", help="不跑 MinerU，只整理已有的原始輸出")
+        if name == "release":
+            p.add_argument("ids", nargs="+")
         if name == "status":
             p.add_argument("--budget", type=float, help="這一批的預算上限（人民幣）")
     args = ap.parse_args()
