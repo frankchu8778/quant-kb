@@ -167,7 +167,7 @@ v2 讓 MiniMax 的價值判斷一致率從 15% 提高到 70%，主要分類一�
 
 | 內容 | 位置 |
 |---|---|
-| 部署計畫 | `PLAN.md` |
+| 部署計畫 | `PLAN_POC.md`（量產規劃在 `PLAN.md`） |
 | 過程紀錄（含所有排錯與失誤） | `pipeline/RUNLOG.md` |
 | 全文（basic / standard / 去固定頁 v2） | `fulltext/poc/basic`、`fulltext/poc/standard`、`fulltext/poc/clean-v2` |
 | 卡片 JSON | `cards/poc/{sonnet,sonnet-v2,minimax,minimax-v2,qwen,qwen-v2-think}/` |

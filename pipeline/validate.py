@@ -76,3 +76,39 @@ def grounding_report(card, fulltext):
     return {"quotes_total": len(quotes), "quotes_found": sum(found),
             "quotes_missing": [q for q, ok in zip(quotes, found) if not ok],
             "numbers_missing": missing_nums}
+
+
+def value_numbers_not_in_quote(card):
+    """key_results.value 的每個數字都要出現在同一列的 quote 裡；回傳不符合的列。"""
+    bad = []
+    for i, r in enumerate(card.get("key_results") or []):
+        q = r.get("quote") or ""
+        miss = [n for n in NUM_RE.findall(r.get("value") or "")
+                if len(n.replace("-", "").replace(".", "")) >= 2 and n.lstrip("-") not in q]
+        if miss:
+            bad.append({"row": i, "metric": r.get("metric"), "value": r.get("value"), "missing": miss})
+    return bad
+
+
+def gate_v4(card, fulltext, schema):
+    """量產的程式硬檢查（卡片 schema v4）。回傳問題清單，空清單 = 通過。
+
+    檢查：schema（含詞彙表 enum）、所有引文在全文、數字在同列引文、每個方法步驟都有引文。
+    """
+    import jsonschema
+    problems = [f"schema {list(e.absolute_path)}: {e.message[:150]}"
+                for e in jsonschema.Draft202012Validator(schema).iter_errors(card)]
+    if problems:
+        return problems
+    ft_norm = _norm(fulltext)
+    quotes = ([(f"key_results.{i}", r["quote"]) for i, r in enumerate(card["key_results"])] +
+              [(f"evidence_quotes.{i}", r["quote"]) for i, r in enumerate(card["evidence_quotes"])] +
+              [(f"method_steps.{i}", r["quote"]) for i, r in enumerate(card["method_steps"])])
+    for path, q in quotes:
+        if "..." in q or "……" in q or "…" in q:
+            problems.append(f"{path}.quote 用省略號拼接：{q[:60]}")
+        elif not quote_found(q, ft_norm):
+            problems.append(f"{path}.quote 在全文找不到：{q[:60]}")
+    for b in value_numbers_not_in_quote(card):
+        problems.append(f"key_results.{b['row']}.value 的數字 {b['missing']} 不在同列引文裡（{b['value'][:40]}）")
+    return problems

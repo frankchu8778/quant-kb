@@ -114,6 +114,11 @@ def run_fable(prompt, schema, effort, wait, max_waits, model="claude-fable-5-2",
 
 # DeepSeek 離峰價（USD / 百萬 token；第三方整理，2026-09～10，未經官方確認）；尖峰為 2 倍
 DEEPSEEK_PRICE = {"deepseek-flash": (0.15, 0.60), "deepseek-v4-pro": (0.66, 1.98)}
+# Kimi 原價 13 / 68 人民幣（使用者提供），以 7.1 換算成 USD；batch 六折未計入
+DEEPSEEK_PRICE.update({"kimi-k3.1-pro": (1.83, 9.58)})
+# Anthropic 相容端點：模型名稱前綴 → (base_url, .env 裡的金鑰名稱)
+COMPAT_ENDPOINTS = {"deepseek": ("https://api.deepseek.com/anthropic", "DEEPSEEK_API_KEY"),
+                    "kimi": ("https://api.moonshot.cn/anthropic", "KIMI_API_KEY")}
 SUBMIT_HINT = "\n\n---\n完成后，调用 `submit` 工具提交结果（参数必须符合工具的 schema），不要在正文输出结果。"
 
 
@@ -133,8 +138,8 @@ def run_deepseek(prompt, schema, effort, model, attempts=3):
     import anthropic
     import jsonschema
     from common import load_env
-    client = anthropic.Anthropic(base_url="https://api.deepseek.com/anthropic",
-                                 api_key=load_env()["DEEPSEEK_API_KEY"], timeout=3600, max_retries=3)
+    base_url, key_name = next(v for k, v in COMPAT_ENDPOINTS.items() if model.startswith(k))
+    client = anthropic.Anthropic(base_url=base_url, api_key=load_env()[key_name], timeout=3600, max_retries=3)
     tool = {"name": "submit", "description": "提交审核结果", "input_schema": schema}
     t0, log, total = time.time(), [], {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0}
     messages = [{"role": "user", "content": prompt + SUBMIT_HINT}]
@@ -145,7 +150,8 @@ def run_deepseek(prompt, schema, effort, model, attempts=3):
                                     extra_body={"output_config": {"effort": effort}}) as st:
             r = st.get_final_message()
         u = r.usage
-        total["input_tokens"] += u.input_tokens + (u.cache_read_input_tokens or 0)
+        # Kimi 的 input_tokens 不含命中快取的部分，完整數字在 prompt_tokens
+        total["input_tokens"] += max(u.input_tokens + (u.cache_read_input_tokens or 0), getattr(u, "prompt_tokens", 0) or 0)
         total["output_tokens"] += u.output_tokens
         total["thinking_tokens"] += getattr(u.output_tokens_details, "thinking_tokens", 0) or 0
         uses = [b for b in r.content if b.type == "tool_use" and b.name == "submit"]
