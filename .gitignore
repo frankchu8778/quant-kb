@@ -9,3 +9,12 @@ __pycache__/
 pipeline/logs/*.log
 pipeline/_mineru_raw/
 pipeline/_mineru_test/
+# 數據（卡片、檢查結果、批次全文、manifest 與指紋）不進 git；POC 階段已提交的保留
+cards/trial/
+eval/trial/
+cards/batch*/
+eval/batch*/
+fulltext/batch*/
+fulltext/poc/clean-v2-standard/
+catalog/
+inbox/*/_selection.json

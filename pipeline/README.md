@@ -8,24 +8,35 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 
 | 階段 | 指令 | 花錢嗎 | 狀態 |
 |---|---|---|---|
+| — 選檔 | `batch.py sample <batch> --n 100` | 否 | 可用 |
 | 0 入庫 | `batch.py ingest <batch>` | 否 | 可用 |
-| 1 轉檔 | `batch.py convert <batch>` | 否（本機 GPU） | 可用，新批次還沒實跑過 MinerU |
+| 1 轉檔 | `batch.py convert <batch>` | 否（本機 GPU） | 可用 |
 | 1a 重複性檢查 | `batch.py dedup <batch>` | 否 | 可用 |
 | 1b 品質閘 | `batch.py quality <batch>` | 否 | 可用 |
 | 2 去固定頁 | `batch.py clean <batch>` | 否 | 可用 |
 | — 預算確認 | `batch.py status <batch> --budget N` | 否 | 可用 |
-| 4 寫卡＋程式檢查 | `trial.py write` | **是** | 只接了 POC 的 20 篇，要改成吃批次 |
-| 6 模型檢查 | `trial.py check` | **是** | 同上 |
-| 6b 退回重寫再複檢 | — | **是** | 未實作 |
+| 4–6b 寫卡、檢查、退回重寫再複檢 | `run.py cards <batch> --budget N` | **是** | 程式寫好，用假資料測過，還沒真的送出 |
+| 8 持續埋雷 | `run.py canary <batch> --budget N` | **是** | 同上 |
+| — 結果統計 | `run.py report <batch>` | 否 | 可用 |
+| — 人工複核表 | `run.py review <batch>` | 否 | 可用 |
+| — 分流規則對照 | `run.py triage <batch>` | 否 | 可用 |
 | 9 發布 | `render_cards.py` | 否 | 還是舊卡片格式，未更新 |
 
-分流（階段 3）、升級（7）、抽樣審計（8）見 `../PLAN.md`，還沒有腳本。
+分流（階段 3）、升級（7）、抽樣審計（8）見 `../PLAN.md`，還沒有腳本。整體關係圖：`../docs/pipeline_overview.png`。待辦：`../TODO.md`。
 
 ## 不花錢的部分：照順序跑
 
+### 選檔（可省略）
+
+```bash
+python batch.py sample batch1 --n 100
+```
+
+從 `.env` 的 `Research_Report_PATH` 隨機選 PDF 複製到 `inbox/batch1/`。已經在 manifest 或其他批次裡的（依檔案雜湊）不會被選到。選了哪些記在 `inbox/batch1/_selection.json`。自己放檔案的話跳過這步。
+
 ### 0. 入庫
 
-把 PDF 放進 `inbox/<batch>/`，檔名用 `YYYYMMDD-券商-標題.pdf`。
+把 PDF 放進 `inbox/<batch>/`，檔名最好是 `YYYYMMDD-券商-標題.pdf`（不是也能跑，只是 id 會變成 `nodate_unknown_<雜湊>`）。
 
 ```bash
 python batch.py ingest batch1
@@ -123,23 +134,63 @@ python batch.py status batch1 --budget 300
 
 **送 API 之前一定要看這一步。**
 
-## 花錢的部分：尚未接上批次
-
-目前 `trial.py` 的來源寫死在 `fulltext/poc/clean-v2`。接上批次時要做的事：
-
-1. 來源改成 `fulltext/<batch>/clean/`，只處理 manifest 裡 `cleaned` 的篇，結果寫回 manifest。
-2. 檢查員判 `revise` 或 `reject` 時，帶著問題清單重寫 1 次再複檢；仍不過的標成「待升級」。
-3. 遇到餘額不足（HTTP 402）整批停下，不要繼續重試。
-4. 累計花費超過 `--budget` 就停。
+## 花錢的部分
 
 模型分工（試產結果，見 `../PLAN.md`）：寫卡 `kimi-k3.1-pro`，檢查 `deepseek-flash`，不同家。
+
+### 先看會花多少
+
+```bash
+python run.py cards batch1 --budget 150 --dry-run
+```
+
+只列出會處理哪些篇和花費估算，不送出任何請求。
+
+### 送出
+
+```bash
+python run.py cards batch1 --budget 150
+```
+
+每篇的流程：寫卡 → 程式檢查（不過就帶錯誤清單重寫 1 次）→ 模型檢查 → 退回的帶問題清單重寫 1 次再複檢 → 仍不過的標成 `escalate`（待升級）。
+
+- `--budget` 是這次執行的上限（人民幣，以原價計，偏保守）。達到後不再送新的請求；已經送出、還沒回來的請求仍會算進去，所以實際會超出一點（最多約並行數 × ¥1）。
+- API 回餘額不足時整批立刻停下。
+- 中斷後重跑同一個指令即可，會從每篇停下的步驟接續，不重複花錢。
+- 建議第一次加 `--limit 5` 先跑 5 篇看結果。
+
+### 看結果
+
+```bash
+python run.py report batch1
+```
+
+程式檢查通過率、模型檢查退回率、**升級率**、每張通過的卡的成本、待升級清單。
+
+### 埋雷：量檢查員的抓到率
+
+```bash
+python run.py canary batch1 --budget 20 --every 4
+```
+
+在通過的卡上故意改一處（數字對調、同大類錯標籤、邏輯改反），送給檢查員，看它擋不擋得下。邏輯類的改寫用 Kimi 產生，不用 Claude。`--every 20` 是量產時的抽樣率；驗證批次建議 `--every 4`，樣本才夠。
+
+「抓到」的判定是程式做的：卡片沒有被放行，而且有一個非 minor 的問題落在被改的欄位上。沒抓到的請打開 `eval/<batch>/_canary/` 看是真的漏掉，還是埋雷本身太弱。
+
+### 人工複核：檢查員說的錯是不是真的錯
+
+```bash
+python run.py review batch1
+```
+
+把檢查員判的 critical / major 列成一張表（`results/major_review_<batch>.md`），每條附卡片原話、檢查員的說法、它引的原文，以及那段原文在全文裡找不找得到。逐條填「真 / 誤報 / 吹毛求疵」，就能算出檢查員的誤報率。
 
 ## 已知的坑
 
 - **POC 與試產的卡片用的是 basic 等級的全文**（`fulltext/poc/clean-v2` 是從 `basic` 清出來的），不是 standard。新批次預設用 standard，行內公式的寫法會不同（`$R^{2}$` 對 `$R ^ { 2 }$`）。第一批跑完要確認程式檢查的引文比對通過率沒有掉。
 - DeepSeek 偶爾回傳壞掉的 JSON，`trial.py` 會重試 3 次。
 - Kimi 每篇約 6 分鐘，5 並行跑 200 篇約 4 小時。
-- `trial_canary.py` 的邏輯類埋雷用 Opus 產生，會用到 Claude 訂閱額度。
+- `trial_canary.py`（試產用）的邏輯類埋雷用 Opus 產生，會用到 Claude 訂閱額度；量產的 `run.py canary` 已改用 Kimi。
 - API 金鑰在 `../.env`（不進 git）：`DEEPSEEK_API_KEY`、`KIMI_API_KEY`。
 
 ## 檔案對照
@@ -147,6 +198,7 @@ python batch.py status batch1 --budget 300
 | 檔案 | 用途 |
 |---|---|
 | `batch.py` | 本機階段：入庫、轉檔、重複性檢查、品質閘、去固定頁、狀態、放行 |
+| `run.py` | 模型階段：寫卡、檢查、退回重寫、埋雷、結果統計、人工複核表 |
 | `clean.py` | 去固定頁的規則 |
 | `validate.py` | 程式硬檢查 `gate_v4`：schema、引文在全文、數字在同列引文 |
 | `card_prompt_v3.md` | 寫卡 prompt（每個方法步驟附引文與章節） |

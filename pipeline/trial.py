@@ -84,11 +84,11 @@ def rids(args):
     return [r for r in ids if r in args.only] if args.only else ids
 
 
-def write_one(rid, writer, c, effort):
-    out = CARDS / writer
+def write_one(rid, writer, c, effort, src=SRC, out_name=None):
+    out = CARDS / (out_name or writer)
     if (out / f"{rid}.json").exists():
         return rid, "skip"
-    fulltext = (SRC / f"{rid}.md").read_text()
+    fulltext = (src / f"{rid}.md").read_text()
     prompt = jf.fill((PIPELINE / "card_prompt_v3.md").read_text(), strategy_types=c.st_text,
                      families=c.fams, methods=c.meths, report_id=rid, fulltext=fulltext)
     card, meta = call(WRITERS[writer], prompt, c.card_schema, effort)
@@ -118,9 +118,10 @@ def write_one(rid, writer, c, effort):
 
 def cmd_write(args):
     c = ctx()
-    (CARDS / args.writer).mkdir(parents=True, exist_ok=True)
+    src = KB / args.src if args.src else SRC
+    (CARDS / (args.out_name or args.writer)).mkdir(parents=True, exist_ok=True)
     with ThreadPoolExecutor(args.workers) as ex:
-        for rid, status in ex.map(lambda r: write_one(r, args.writer, c, args.effort), rids(args)):
+        for rid, status in ex.map(lambda r: write_one(r, args.writer, c, args.effort, src, args.out_name), rids(args)):
             print(f"{rid}  {status}", flush=True)
 
 
@@ -204,6 +205,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     w = sub.add_parser("write")
     w.add_argument("--writer", choices=list(WRITERS), required=True)
+    w.add_argument("--src", help="全文資料夾（相對 KB）；預設 fulltext/poc/clean-v2")
+    w.add_argument("--out-name", help="輸出到 cards/trial/<out-name>/；預設同 writer")
     g = sub.add_parser("gate")
     g.add_argument("--verbose", action="store_true")
     k = sub.add_parser("check")

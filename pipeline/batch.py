@@ -1,6 +1,7 @@
 """量產的本機階段（不呼叫任何模型 API）：入庫 → 轉檔 → 品質閘 → 去固定頁 → 狀態與花費估算。
 
 用法（<batch> 是 inbox/ 下的資料夾名稱，例如 batch1）：
+  python batch.py sample  <batch> --n 100         # 從 .env 的 Research_Report_PATH 隨機選 PDF 複製到 inbox/<batch>/
   python batch.py ingest  <batch>                 # 階段 0：掃描 PDF、去重、寫進 manifest
   python batch.py convert <batch> [--tier standard] [--postprocess-only]   # 階段 1：MinerU（本機 GPU）
   python batch.py dedup   <batch>                 # 階段 1a：全文相似度比對，疑似重複的標成 hold
@@ -172,6 +173,47 @@ def page_count(pdf):
         return None
 
 
+def source_dir(args):
+    if args.src:
+        return Path(args.src)
+    from common import load_env
+    env = {k.strip(): v.strip() for k, v in load_env().items()}  # .env 裡等號兩邊可能有空格
+    if "Research_Report_PATH" not in env:
+        raise SystemExit(".env 裡沒有 Research_Report_PATH，請用 --src 指定來源資料夾")
+    return Path(env["Research_Report_PATH"])
+
+
+def cmd_sample(args):
+    """隨機選 PDF 複製進 inbox/<batch>/。已在 manifest 或其他 inbox 批次裡的（依檔案雜湊）不會被選到。"""
+    import random
+    import shutil
+    src = source_dir(args)
+    if not src.is_dir():
+        raise SystemExit(f"來源資料夾不存在：{src}")
+    sha = lambda p: hashlib.sha1(p.read_bytes()).hexdigest()
+    known = {v["sha1"] for v in load().values()}
+    known |= {sha(p) for p in (ROOT / "inbox").glob("*/*.pdf")}
+    pool = sorted(p for p in src.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
+    random.Random(args.seed).shuffle(pool)
+    dest = ROOT / "inbox" / args.batch
+    dest.mkdir(parents=True, exist_ok=True)
+    picked, skipped = [], 0
+    for p in pool:
+        if len(picked) >= args.n:
+            break
+        h = sha(p)
+        if h in known:   # 已處理過，或這次已選到內容完全相同的另一份
+            skipped += 1
+            continue
+        known.add(h)
+        name = p.name if not (dest / p.name).exists() else f"{p.stem}__{h[:6]}{p.suffix}"
+        shutil.copy2(p, dest / name)
+        picked.append({"file": name, "from": str(p.relative_to(src)), "sha1": h})
+    (dest / "_selection.json").write_text(json.dumps(
+        {"source": str(src), "seed": args.seed, "pool": len(pool), "picked": picked}, ensure_ascii=False, indent=2))
+    print(f"來源 {src}：共 {len(pool)} 份 PDF；選了 {len(picked)} 份複製到 {dest}；略過已處理或完全相同的 {skipped} 份")
+
+
 def cmd_ingest(args):
     m = load()
     by_hash = {v["sha1"]: k for k, v in m.items()}
@@ -260,13 +302,20 @@ def cmd_convert(args):
         stage.mkdir(parents=True)
         for _, v in todo:
             (stage / v["source_pdf"]).symlink_to(inbox / v["source_pdf"])
+        env = dict(os.environ)
+        if args.tier == "standard":  # standard 等級的 VLM 連本機 vLLM（serve_mineru_vlm.sh），不上傳資料
+            import socket
+            with socket.socket() as s:
+                if s.connect_ex(("127.0.0.1", 8001)) != 0:
+                    raise SystemExit("MinerU 的 VLM 服務沒有啟動（port 8001）。先跑：bash serve_mineru_vlm.sh")
+            env["MINERU_CONFIG"] = str(KB / "pipeline" / "mineru-standard.yaml")
         log = ROOT / "pipeline" / "logs" / f"mineru-{args.batch}-{args.tier}.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         print(f"MinerU {args.tier}：{len(todo)} 篇（log: {log}）", flush=True)
         t0 = time.time()
         with open(log, "a") as f:
             code = subprocess.run([MINERU, "parse", str(stage), "-o", str(raw_dir), "--tier", args.tier, "-v"],
-                                  stdout=f, stderr=subprocess.STDOUT).returncode
+                                  stdout=f, stderr=subprocess.STDOUT, env=env).returncode
         print(f"MinerU 結束 exit={code}，{time.time() - t0:.0f} 秒")
     done = miss = 0
     for rid, v in b.items():
@@ -441,12 +490,16 @@ def cmd_status(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["ingest", "convert", "dedup", "quality", "clean", "status", "release"]:
+    for name in ["sample", "ingest", "convert", "dedup", "quality", "clean", "status", "release"]:
         p = sub.add_parser(name)
         p.add_argument("batch")
         if name == "convert":
             p.add_argument("--tier", default="standard", choices=["basic", "standard"])
             p.add_argument("--postprocess-only", action="store_true", help="不跑 MinerU，只整理已有的原始輸出")
+        if name == "sample":
+            p.add_argument("--n", type=int, default=100)
+            p.add_argument("--seed", default="batch-sample-v1")
+            p.add_argument("--src", help="來源資料夾；不給就用 .env 的 Research_Report_PATH")
         if name == "release":
             p.add_argument("ids", nargs="+")
         if name == "status":
