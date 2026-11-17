@@ -1,8 +1,10 @@
 """量產的模型階段（會送 API、會花錢）：寫卡 → 程式檢查 → 模型檢查 → 退回重寫再複檢 → 埋雷監控。
 
 用法（<batch> 要先跑完 batch.py 的本機階段）：
-  python run.py cards  <batch> --budget 150 --dry-run     # 只列出會做什麼、估算花費，不送出
-  python run.py cards  <batch> --budget 150               # 真的送出
+  python run.py probe   <batch> --budget 5                # 用 batch 的請求格式即時試打 1 篇，驗證格式
+  python run.py submit  <batch> --limit 5 --budget 60 [--dry-run]   # 第一次寫卡送進 Kimi batch（六折），每 20 篇一個 batch
+  python run.py collect <batch> --budget 60 [--wait]      # 收回完成的 batch，接著做程式檢查、模型檢查、重寫
+  python run.py cards  <batch> --budget 150 [--dry-run]   # 備援：全部走即時 API（原價）
   python run.py canary <batch> --budget 20 [--every 20]   # 在通過的卡上埋雷，量檢查員的抓到率
   python run.py report <batch>                            # 通過率、退回率、升級率、花費（不送 API）
   python run.py review <batch>|--trial                    # 把檢查員判的 critical / major 列成人工複核表（不送 API）
@@ -17,6 +19,10 @@
                                    否則 → escalate（待升級，交給更強的模型或人工）
 中斷後重跑會從每篇停下的地方接續，已完成的步驟不重做、不重複花錢。
 
+batch 模式：只有第一次寫卡走 batch（每篇一個任務，custom_id 就是研報 id）；
+程式檢查不過的重寫、檢查員退回的重寫走即時，免得每篇要等好幾輪。
+送出前會查兩個平台的餘額，任一邊低於這一步估計花費的 1.3 倍就不送。
+
 保護措施：
   --budget   這次執行的花費上限（人民幣）。每次呼叫前檢查，超過就不再送新的請求。
   餘額不足   API 回 402 時整批立刻停下。
@@ -24,6 +30,9 @@
 
 檔案：
   cards/<batch>/<id>.json            最終卡片；<id>.v1.json 是被退回前的版本
+  eval/<batch>/<id>/kimi_write.json  第一次寫卡的結果（batch 或即時）
+  eval/<batch>/_kimi_batches/        送出的 JSONL 與收回的原始結果
+  catalog/kimi_batches.json          每個 batch 的 id、任務清單、狀態、等待時間
   eval/<batch>/<id>/notes.json       檢查員獨立讀全文的筆記
   eval/<batch>/<id>/check1.json      第一次檢查；check2.json 是重寫後的複檢
   eval/<batch>/_canary/              埋雷版卡片與檢查結果
@@ -37,6 +46,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import batch as B
+import kimi_batch as KB
 import judge_fable as jf
 import trial as T
 import trial_canary as TC
@@ -44,18 +54,26 @@ from common import PIPELINE
 from validate import gate_v4
 
 WRITER, CHECKER = "kimi-k3.1-pro", "deepseek-flash"
-PRICE_CNY = {"kimi": (13, 68), "deepseek": (2, 8)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
+PRICE_CNY = {"kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
 RETRY_WAITS = [10, 30, 90]
 BILLING_HINTS = ("402", "insufficient balance", "billing")
+SAFETY = 1.3              # 餘額要有估計花費的幾倍才送
+REWRITE_SHARE = 0.25      # 估計有多少比例的篇會需要即時重寫（試產約一到兩成，取保守值）
+RECHECK_SHARE = 0.20      # 估計有多少比例的篇會需要複檢
+REGISTRY = B.ROOT / "catalog" / "kimi_batches.json"
 
 
 class Stop(Exception):
     """整批都該停下的情況：預算用完、餘額不足。"""
 
 
+class Waiting(Exception):
+    """第一次寫卡還在 Kimi batch 裡，這篇先停在這裡。"""
+
+
 class Runner:
-    def __init__(self, batch, budget, dry_run=False):
-        self.batch, self.budget, self.dry_run = batch, budget, dry_run
+    def __init__(self, batch, budget, dry_run=False, mode="realtime"):
+        self.batch, self.budget, self.dry_run, self.mode = batch, budget, dry_run, mode
         self.spent = 0.0
         self.lock = threading.Lock()
         self.stop_reason = None
@@ -64,7 +82,7 @@ class Runner:
 
     # ---- 花費與呼叫 ----
     def cost_cny(self, model, usage):
-        pin, pout = next(v for k, v in PRICE_CNY.items() if model.startswith(k))
+        pin, pout = PRICE_CNY[model] if model in PRICE_CNY else next(v for k, v in PRICE_CNY.items() if model.startswith(k))
         u = usage or {}
         return round((u.get("input_tokens", 0) * pin + u.get("output_tokens", 0) * pout) / 1e6, 4)
 
@@ -118,7 +136,8 @@ class Runner:
     def write_card(self, rid, fulltext, rec, extra="", step="write"):
         """寫卡並過程式檢查；不過就帶錯誤清單重寫 1 次。回傳 (卡片, 程式檢查問題)。"""
         prompt = self.write_prompt(rid, fulltext) + extra
-        card = self.call(WRITER, prompt, self.ctx.card_schema, rec, step)
+        card = self.first_write(rid, prompt, rec) if step == "write" else \
+            self.call(WRITER, prompt, self.ctx.card_schema, rec, step)
         if card is None:
             return None, ["模型沒有回傳卡片"]
         problems = gate_v4(card, fulltext, self.ctx.card_schema)
@@ -132,6 +151,23 @@ class Runner:
                 card, problems = card2, gate_v4(card2, fulltext, self.ctx.card_schema)
                 rec["gate"].append({"step": step + "-gatefix", "problems": len(problems)})
         return card, problems
+
+    def first_write(self, rid, prompt, rec):
+        """第一次寫卡：結果已落檔就用；batch 模式下還沒回來就等；即時模式直接呼叫。"""
+        p = self.paths(rid)[1] / "kimi_write.json"
+        if p.exists():
+            data = json.loads(p.read_text())
+            if data.get("card") is not None or data.get("retried"):
+                return data.get("card")
+            # batch 任務失敗（模型沒回傳合法卡片）：即時重試 1 次
+            card = self.call(WRITER, prompt, self.ctx.card_schema, rec, "write-retry")
+            p.write_text(json.dumps({**data, "card": card, "retried": True}, ensure_ascii=False, indent=2))
+            return card
+        if self.mode == "batch":
+            raise Waiting()
+        card = self.call(WRITER, prompt, self.ctx.card_schema, rec, "write")
+        p.write_text(json.dumps({"card": card, "via": "realtime"}, ensure_ascii=False, indent=2))
+        return card
 
     def notes(self, rid, fulltext, ev, rec):
         p = ev / "notes.json"
@@ -216,6 +252,10 @@ class Runner:
             sev = [i["severity"] for i in c2["issues"]]
             return self.finish(rid, rec, "escalate",
                                f"重寫後複檢仍是 {c2['verdict']}（critical {sev.count('critical')}、major {sev.count('major')}）")
+        except Waiting:
+            rec["state"] = "waiting"
+            self.save()
+            return rid, "等待 Kimi batch"
         except Stop as e:
             rec["state"] = "interrupted"
             self.save()
@@ -251,6 +291,220 @@ def ready(manifest, batch):
     return sorted(rid for rid, v in manifest.items() if v["batch"] == batch and v["status"] == "cleaned")
 
 
+# ---- Kimi batch：登記簿、餘額檢查、送出、收回 ----
+def load_reg():
+    return json.loads(REGISTRY.read_text()) if REGISTRY.exists() else []
+
+
+def save_reg(reg):
+    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    tmp = REGISTRY.with_suffix(".tmp")
+    tmp.write_text(json.dumps(reg, ensure_ascii=False, indent=2))
+    tmp.replace(REGISTRY)
+
+
+def pending(r, batch):
+    """還沒有第一次寫卡結果、也不在任何未收回 batch 裡的篇。"""
+    flying = {rid for e in load_reg() if not e["collected"] for rid in e["rids"]}
+    return [rid for rid in ready(r.manifest, batch)
+            if r.manifest[rid].get("card", {}).get("state") not in ("passed", "escalate")
+            and rid not in flying
+            and not (B.ROOT / "eval" / batch / rid / "kimi_write.json").exists()]
+
+
+def preflight(chars, write_via, label, kimi_extra=0.0, ds_extra=0.0):
+    """送出前的餘額檢查。回傳 True 才可以送。
+
+    需求量用這批每篇的實際字數算：
+      Kimi     = 第一次寫卡（write_via 的價格）＋ REWRITE_SHARE 的篇數即時重寫
+      DeepSeek = 筆記與檢查（尖峰價）＋ RECHECK_SHARE 的複檢
+    任一邊餘額 < 需求 × SAFETY 就不通過；餘額查不到也不通過。
+    """
+    first = B.estimate(chars, write_via, "deepseek")[0] if chars and write_via else 0.0
+    rewrite, check = B.estimate(chars, "kimi", "deepseek") if chars else (0.0, 0.0)
+    need = {"Kimi": first + REWRITE_SHARE * rewrite + kimi_extra,
+            "DeepSeek": check * (1 + RECHECK_SHARE) + ds_extra}
+    ok = True
+    print(f"餘額檢查（{label}）：")
+    for name, fn in [("Kimi", KB.balance), ("DeepSeek", KB.deepseek_balance)]:
+        try:
+            bal = fn()
+        except Exception as e:
+            print(f"  {name:<8} 餘額查詢失敗（{str(e)[:80]}）→ 不送")
+            ok = False
+            continue
+        want = need[name] * SAFETY
+        enough = bal >= want
+        ok &= enough
+        print(f"  {name:<8} 估計花費 ¥{need[name]:6.2f}，要求餘額 ≥ ¥{want:6.2f}，目前 ¥{bal:7.2f}  "
+              + ("夠" if enough else f"不夠，還差 ¥{want - bal:.2f}"))
+    return ok
+
+
+def cmd_probe(args):
+    """用和 batch 完全相同的請求內容打即時端點（原價），驗證格式。"""
+    if args.budget is None:
+        raise SystemExit("必須給 --budget")
+    r = Runner(args.batch, args.budget)
+    todo = pending(r, args.batch)[:args.n]
+    chars = [r.manifest[rid]["chars_clean"] for rid in todo]
+    if not preflight(chars, "kimi", f"即時試打 {len(todo)} 篇"):
+        raise SystemExit("餘額不足，沒有送出")
+    for rid in todo:
+        _, ev = r.paths(rid)
+        body = KB.chat_body(r.write_prompt(rid, r.fulltext(rid)), r.ctx.card_schema)
+        t0 = time.time()
+        resp = KB.chat_realtime(body)
+        secs = round(time.time() - t0)
+        (ev / "kimi_probe_raw.json").write_text(json.dumps(resp, ensure_ascii=False, indent=2))
+        out, err, usage = KB.parse_response(resp, r.ctx.card_schema)
+        cost = r.cost_cny("kimi", usage)
+        rec = r.manifest[rid].setdefault("card", {"state": "new"})
+        rec.setdefault("calls", []).append({"step": "write", "model": "kimi(openai 格式即時)", "cny": cost,
+                                            "seconds": secs, "ok": out is not None})
+        rec["cost_cny"] = round(rec.get("cost_cny", 0) + cost, 4)
+        r.spent += cost
+        (ev / "kimi_write.json").write_text(json.dumps({"card": out, "error": err, "usage": usage,
+                                                        "via": "realtime-openai"}, ensure_ascii=False, indent=2))
+        msg = resp["choices"][0]["message"]
+        print(f"{rid}: {secs} 秒，usage {usage}，¥{cost:.2f}；finish={resp['choices'][0].get('finish_reason')}；"
+              f"tool_calls={len(msg.get('tool_calls') or [])}；{'卡片合法' if out is not None else '失敗：' + err}")
+        r.save()
+        if out is not None:
+            print("  後續：", r.process(rid)[1])
+    print(f"這次花費 ¥{r.spent:.2f}")
+
+
+def cmd_submit(args):
+    r = Runner(args.batch, args.budget, mode="batch")
+    todo = pending(r, args.batch)
+    if args.limit:
+        todo = todo[:args.limit]
+    chunks = [todo[i:i + args.chunk] for i in range(0, len(todo), args.chunk)]
+    chars = [r.manifest[rid]["chars_clean"] for rid in todo]
+    est = B.estimate(chars, "kimi-batch", "deepseek")[0] if chars else 0.0
+    print(f"批次 {args.batch}：要送 {len(todo)} 個任務（每篇一個），分成 {len(chunks)} 個 batch（每個最多 {args.chunk} 篇）；"
+          f"第一次寫卡估計 ¥{est:.2f}（batch 價）")
+    if not todo:
+        return
+    ok = preflight(chars, "kimi-batch", f"送出 {len(todo)} 篇")
+    if args.dry_run:
+        for i, ch in enumerate(chunks):
+            print(f"  batch {i + 1}: {len(ch)} 篇，例如 {ch[0]}")
+        print("（--dry-run：沒有上傳、沒有建立任何 batch）")
+        return
+    if not ok:
+        raise SystemExit("餘額不足，沒有送出任何 batch")
+    if args.budget is None:
+        raise SystemExit("真的送出時必須給 --budget")
+    if est > args.budget:
+        raise SystemExit(f"估計 ¥{est:.2f} 超過預算 ¥{args.budget:.2f}，沒有送出")
+    out_dir = B.ROOT / "eval" / args.batch / "_kimi_batches"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    reg = load_reg()
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    for i, ch in enumerate(chunks):
+        path = out_dir / f"{stamp}_{i + 1}.jsonl"
+        with open(path, "w") as f:
+            for rid in ch:
+                body = KB.chat_body(r.write_prompt(rid, r.fulltext(rid)), r.ctx.card_schema)
+                f.write(json.dumps({"custom_id": rid, "method": "POST", "url": "/v1/chat/completions", "body": body},
+                                   ensure_ascii=False) + "\n")
+        fid = KB.upload(path)
+        info = KB.create(fid, args.window, {"kb_batch": args.batch})
+        reg.append({"id": info["id"], "batch": args.batch, "input_file_id": fid, "jsonl": str(path), "rids": ch,
+                    "status": info.get("status"), "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "created_ts": time.time(), "est_cny": round(B.estimate([r.manifest[x]["chars_clean"] for x in ch],
+                                                                           "kimi-batch", "deepseek")[0], 2),
+                    "collected": False})
+        save_reg(reg)   # 每建立一個就存，中途失敗也不會重複送
+        for rid in ch:
+            r.manifest[rid].setdefault("card", {"state": "new"})["state"] = "waiting"
+        r.save()
+        print(f"  已送出 batch {i + 1}/{len(chunks)}：{info['id']}（{len(ch)} 篇，狀態 {info.get('status')}）")
+    print("收回：python run.py collect " + args.batch + " --budget N [--wait]")
+
+
+def collect_one(r, e, info):
+    """把一個已結束的 batch 的結果寫回每篇的 kimi_write.json 並記帳。回傳 (成功數, 花費)。"""
+    out_dir = B.ROOT / "eval" / e["batch"] / "_kimi_batches"
+    results, n_ok, cost_total = {}, 0, 0.0
+    for key, fname in [("output_file_id", "output"), ("error_file_id", "error")]:
+        if info.get(key):
+            text = KB.download(info[key])
+            (out_dir / f"{e['id']}.{fname}.jsonl").write_text(text)
+            for line in text.splitlines():
+                if line.strip():
+                    row = json.loads(line)
+                    results.setdefault(row.get("custom_id"), row)
+    for rid in e["rids"]:
+        row = results.get(rid)
+        body = ((row or {}).get("response") or {}).get("body")
+        if row is None:
+            out, err, usage = None, f"結果檔裡沒有這個任務（batch 狀態 {info.get('status')}）", {}
+        elif row.get("error") or not body or (row["response"].get("status_code") or 200) >= 400:
+            out, err, usage = None, f"任務失敗：{json.dumps(row.get('error') or body, ensure_ascii=False)[:300]}", {}
+        else:
+            out, err, usage = KB.parse_response(body, r.ctx.card_schema)
+        cost = r.cost_cny("kimi-batch", usage)
+        cost_total += cost
+        n_ok += out is not None
+        _, ev = r.paths(rid)
+        (ev / "kimi_write.json").write_text(json.dumps({"card": out, "error": err, "usage": usage, "via": "batch",
+                                                        "batch_id": e["id"]}, ensure_ascii=False, indent=2))
+        rec = r.manifest[rid].setdefault("card", {"state": "new"})
+        rec.setdefault("calls", []).append({"step": "write", "model": "kimi-batch", "cny": cost, "ok": out is not None})
+        rec["cost_cny"] = round(rec.get("cost_cny", 0) + cost, 4)
+        rec["state"] = "written" if out is not None else "write_failed"
+    r.save()
+    return n_ok, cost_total
+
+
+def cmd_collect(args):
+    if args.budget is None:
+        raise SystemExit("必須給 --budget（收回後的檢查與重寫會花錢）")
+    r = Runner(args.batch, args.budget)
+    reg, t_start = load_reg(), time.time()
+    while True:
+        open_entries = [e for e in reg if e["batch"] == args.batch and not e["collected"]]
+        for e in open_entries:
+            info = KB.retrieve(e["id"])
+            e["status"], e["request_counts"] = info.get("status"), info.get("request_counts")
+            if info.get("status") in KB.OPEN_STATUS:
+                continue
+            n_ok, cost = collect_one(r, e, info)
+            e.update(collected=True, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"),
+                     wait_minutes=round((time.time() - e["created_ts"]) / 60, 1),
+                     ok=n_ok, cost_cny=round(cost, 2))
+            print(f"收回 {e['id']}：狀態 {e['status']}，{n_ok}/{len(e['rids'])} 張卡合法，"
+                  f"等了 {e['wait_minutes']} 分鐘，batch 價 ¥{cost:.2f}（估計 ¥{e['est_cny']:.2f}）", flush=True)
+        save_reg(reg)
+        still = [e for e in reg if e["batch"] == args.batch and not e["collected"]]
+        if not still or not args.wait:
+            for e in still:
+                print(f"還沒完成 {e['id']}：{e['status']} {e.get('request_counts')}，已等 {(time.time() - e['created_ts']) / 60:.0f} 分鐘")
+            break
+        if time.time() - t_start > args.max_wait * 60:
+            print(f"已等 {args.max_wait} 分鐘，先停下；之後重跑 collect 即可")
+            break
+        time.sleep(args.poll)
+    # 接續：所有已有第一次寫卡結果、但還沒走完的篇
+    todo = [rid for rid in ready(r.manifest, args.batch)
+            if r.manifest[rid].get("card", {}).get("state") not in ("passed", "escalate", "error")
+            and (B.ROOT / "eval" / args.batch / rid / "kimi_write.json").exists()]
+    if not todo:
+        return
+    chars = [r.manifest[rid]["chars_clean"] for rid in todo]
+    if not preflight(chars, None, f"檢查與重寫 {len(todo)} 篇"):
+        print("餘額不足：卡片已收回落檔，檢查與重寫先不做。儲值後重跑 collect 即可，不會重複花錢。")
+        return
+    with ThreadPoolExecutor(args.workers) as ex:
+        for rid, status in ex.map(r.process, todo):
+            print(f"{rid}  {status}", flush=True)
+    print(f"\n這次即時呼叫花費 ¥{r.spent:.2f}" + (f"；提前停下：{r.stop_reason}" if r.stop_reason else ""))
+    cmd_report(args)
+
+
 def cmd_cards(args):
     r = Runner(args.batch, args.budget, args.dry_run)
     todo = [rid for rid in ready(r.manifest, args.batch)
@@ -268,6 +522,8 @@ def cmd_cards(args):
         return
     if args.budget is None:
         raise SystemExit("真的送出時必須給 --budget")
+    if not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇"):
+        raise SystemExit("餘額不足，沒有送出")
     with ThreadPoolExecutor(args.workers) as ex:
         for rid, status in ex.map(r.process, todo):
             print(f"{rid}  {status}", flush=True)
@@ -358,6 +614,9 @@ def cmd_canary(args):
     # 依 id 的雜湊固定抽樣：每 every 張抽 1 張，重跑會抽到同一批
     picks = [rid for rid in passed if int(hashlib.sha1(rid.encode()).hexdigest(), 16) % args.every == 0 and rid not in done]
     print(f"通過的卡 {len(passed)} 張，這次埋雷 {len(picks)} 張（每 {args.every} 張 1 張；已做過 {len(done)} 張）")
+    # 邏輯類埋雷要 Kimi 改寫一小段（約 ¥0.4），每個埋雷要 DeepSeek 檢查一次（尖峰約 ¥0.15）
+    if picks and not preflight([], None, f"埋雷 {len(picks)} 張", kimi_extra=0.4 * len(picks) / 3, ds_extra=0.15 * len(picks)):
+        raise SystemExit("餘額不足，沒有送出")
     for rid in picks:
         rec = {}
         try:
@@ -459,17 +718,27 @@ def cmd_triage(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["cards", "canary", "report", "review", "triage"]:
+    for name in ["probe", "submit", "collect", "cards", "canary", "report", "review", "triage"]:
         p = sub.add_parser(name)
         p.add_argument("batch", nargs="?" if name in ("review", "triage") else None)
         if name in ("review", "triage"):
             p.add_argument("--trial", action="store_true", help="用試產 20 篇的資料")
-        if name in ("cards", "canary"):
+        if name in ("probe", "submit", "collect", "cards", "canary"):
             p.add_argument("--budget", type=float, help="這次執行的花費上限（人民幣）")
-        if name == "cards":
+        if name in ("cards", "collect"):
             p.add_argument("--workers", type=int, default=5)
+        if name in ("cards", "submit"):
             p.add_argument("--limit", type=int, help="只處理前 N 篇")
             p.add_argument("--dry-run", action="store_true", help="只列出會做什麼，不送出")
+        if name == "probe":
+            p.add_argument("--n", type=int, default=1)
+        if name == "submit":
+            p.add_argument("--chunk", type=int, default=20, help="每個 batch 最多幾篇")
+            p.add_argument("--window", default="12h", help="completion_window，最短 12h")
+        if name == "collect":
+            p.add_argument("--wait", action="store_true", help="等到所有 batch 完成")
+            p.add_argument("--poll", type=int, default=120, help="每隔幾秒查一次")
+            p.add_argument("--max-wait", type=int, default=180, help="最多等幾分鐘")
         if name == "canary":
             p.add_argument("--every", type=int, default=20)
     args = ap.parse_args()

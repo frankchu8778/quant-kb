@@ -15,7 +15,10 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 | 1b 品質閘 | `batch.py quality <batch>` | 否 | 可用 |
 | 2 去固定頁 | `batch.py clean <batch>` | 否 | 可用 |
 | — 預算確認 | `batch.py status <batch> --budget N` | 否 | 可用 |
-| 4–6b 寫卡、檢查、退回重寫再複檢 | `run.py cards <batch> --budget N` | **是** | 程式寫好，用假資料測過，還沒真的送出 |
+| 4 第一次寫卡（Kimi batch，六折） | `run.py submit <batch> --limit N --budget X` | **是** | 見下方 |
+| 5–6b 收回、檢查、退回重寫再複檢 | `run.py collect <batch> --budget X --wait` | **是** | 見下方 |
+| — 格式試打 | `run.py probe <batch> --budget 5` | **是**（約 ¥1.3） | 見下方 |
+| — 備援：全部走即時 | `run.py cards <batch> --budget X` | **是**（原價） | 用假資料測過 |
 | 8 持續埋雷 | `run.py canary <batch> --budget N` | **是** | 同上 |
 | — 結果統計 | `run.py report <batch>` | 否 | 可用 |
 | — 人工複核表 | `run.py review <batch>` | 否 | 可用 |
@@ -138,26 +141,63 @@ python batch.py status batch1 --budget 300
 
 模型分工（試產結果，見 `../PLAN.md`）：寫卡 `kimi-k3.1-pro`，檢查 `deepseek-flash`，不同家。
 
-### 先看會花多少
+### 送出前一定會做的餘額檢查
 
-```bash
-python run.py cards batch1 --budget 150 --dry-run
+`submit`、`collect`、`probe`、`cards`、`canary` 在送出任何付費請求之前，都會先：
+
+1. 用這批每篇的**實際字數**估這一步要花多少（Kimi：第一次寫卡 ＋ 兩成五的篇數即時重寫；DeepSeek：筆記與檢查以尖峰價計 ＋ 兩成複檢）。
+2. 即時查兩個平台的餘額。
+3. **任一邊餘額低於估計的 1.3 倍就不送**，並印出還差多少。DeepSeek 不夠時寫卡也不送，免得卡寫好了沒錢檢查。餘額查不到也不送。
+
+```
+餘額檢查（送出 46 篇）：
+  Kimi     估計花費 ¥ 36.55，要求餘額 ≥ ¥ 47.52，目前 ¥  91.50  夠
+  DeepSeek 估計花費 ¥ 13.77，要求餘額 ≥ ¥ 17.90，目前 ¥  45.30  夠
 ```
 
-只列出會處理哪些篇和花費估算，不送出任何請求。
+加 `--dry-run` 只印這張表和任務清單，不上傳、不建立 batch。
 
-### 送出
+### 流程：Kimi batch
+
+只有**第一次寫卡**走 batch（六折）；程式檢查不過的重寫、檢查員退回的重寫走即時，否則每篇最多要等三輪。
+
+```bash
+python run.py submit batch1 --limit 20 --budget 60 --dry-run
+```
+
+```bash
+python run.py submit batch1 --limit 20 --budget 60
+```
+
+- 每篇研報是 JSONL 裡的一行、一個任務，`custom_id` 就是研報 id。每個 batch 最多 20 篇（`--chunk`）。
+- 送出的 JSONL 存在 `eval/<batch>/_kimi_batches/`，每個 batch 的 id、任務清單、狀態記在 `catalog/kimi_batches.json`。
+- 已經送出、還沒收回的篇不會重複送。
+
+```bash
+python run.py collect batch1 --budget 60 --wait
+```
+
+- 查每個 batch 的狀態；完成的下載結果、逐篇落檔到 `eval/<batch>/<id>/kimi_write.json`，以 batch 價記帳。
+- 接著對收回的篇做：程式檢查（不過就即時重寫 1 次）→ DeepSeek 檢查 → 退回的即時重寫 1 次再複檢 → 仍不過的標成 `escalate`。
+- batch 裡失敗的任務（例如輸出被截斷）會即時重試 1 次。
+- `--wait` 會每 2 分鐘查一次，最多等 `--max-wait` 分鐘（預設 180）。不加就只查一次。**完成後要盡快收回**，結果檔保留多久官方沒寫。
+- 中斷後重跑同一個指令即可，不重複花錢。
+
+### 格式試打
+
+```bash
+python run.py probe batch1 --budget 5
+```
+
+用和 batch **完全相同的請求內容**打即時端點（原價，約 ¥1.3）。改了寫卡 prompt 或卡片 schema 之後先跑這個：格式有錯會立刻被拒絕（不扣錢），不用等 batch 跑完才發現。
+
+### 備援：全部走即時
 
 ```bash
 python run.py cards batch1 --budget 150
 ```
 
-每篇的流程：寫卡 → 程式檢查（不過就帶錯誤清單重寫 1 次）→ 模型檢查 → 退回的帶問題清單重寫 1 次再複檢 → 仍不過的標成 `escalate`（待升級）。
-
-- `--budget` 是這次執行的上限（人民幣，以原價計，偏保守）。達到後不再送新的請求；已經送出、還沒回來的請求仍會算進去，所以實際會超出一點（最多約並行數 × ¥1）。
-- API 回餘額不足時整批立刻停下。
-- 中斷後重跑同一個指令即可，會從每篇停下的步驟接續，不重複花錢。
-- 建議第一次加 `--limit 5` 先跑 5 篇看結果。
+batch 等太久時用。每篇多約 ¥0.43。
 
 ### 看結果
 
@@ -188,6 +228,8 @@ python run.py review batch1
 ## 已知的坑
 
 - **POC 與試產的卡片用的是 basic 等級的全文**（`fulltext/poc/clean-v2` 是從 `basic` 清出來的），不是 standard。新批次預設用 standard，行內公式的寫法會不同（`$R^{2}$` 對 `$R ^ { 2 }$`）。第一批跑完要確認程式檢查的引文比對通過率沒有掉。
+- Kimi 的 batch 只有 OpenAI 格式（`/v1/files` ＋ `/v1/batches`），Anthropic 相容端點沒有 batch；DeepSeek 沒有 batch 介面，離峰半價是依時段自動計算。
+- Kimi 的 OpenAI 格式要求工具參數的每個欄位都明寫 `type`，只有 `enum` 的欄位會被拒絕（`kimi_batch.moonshot_schema` 會補上）。
 - DeepSeek 偶爾回傳壞掉的 JSON，`trial.py` 會重試 3 次。
 - Kimi 每篇約 6 分鐘，5 並行跑 200 篇約 4 小時。
 - `trial_canary.py`（試產用）的邏輯類埋雷用 Opus 產生，會用到 Claude 訂閱額度；量產的 `run.py canary` 已改用 Kimi。
@@ -198,7 +240,8 @@ python run.py review batch1
 | 檔案 | 用途 |
 |---|---|
 | `batch.py` | 本機階段：入庫、轉檔、重複性檢查、品質閘、去固定頁、狀態、放行 |
-| `run.py` | 模型階段：寫卡、檢查、退回重寫、埋雷、結果統計、人工複核表 |
+| `run.py` | 模型階段：batch 送出與收回、檢查、退回重寫、餘額檢查、埋雷、結果統計、人工複核表 |
+| `kimi_batch.py` | Kimi 的 OpenAI 格式介面：batch 任務、即時呼叫、餘額查詢 |
 | `clean.py` | 去固定頁的規則 |
 | `validate.py` | 程式硬檢查 `gate_v4`：schema、引文在全文、數字在同列引文 |
 | `card_prompt_v3.md` | 寫卡 prompt（每個方法步驟附引文與章節） |
