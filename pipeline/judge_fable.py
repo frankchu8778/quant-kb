@@ -137,7 +137,9 @@ def run_deepseek(prompt, schema, effort, model, attempts=3):
     """DeepSeek 的 Anthropic 相容端點。沒有 structured output，改用工具呼叫取 JSON，再用 jsonschema 驗證。"""
     import anthropic
     import jsonschema
+    import offpeak
     from common import load_env
+    offpeak.guard(model)
     base_url, key_name = next(v for k, v in COMPAT_ENDPOINTS.items() if model.startswith(k))
     client = anthropic.Anthropic(base_url=base_url, api_key=load_env()[key_name], timeout=3600, max_retries=3)
     tool = {"name": "submit", "description": "提交审核结果", "input_schema": schema}
@@ -145,6 +147,7 @@ def run_deepseek(prompt, schema, effort, model, attempts=3):
     messages = [{"role": "user", "content": prompt + SUBMIT_HINT}]
     last_bad = None
     for i in range(attempts):
+        offpeak.guard(model)   # DeepSeek 尖峰時段不呼叫（Kimi 不受影響）；每次重試前都再確認
         with client.messages.stream(model=model, max_tokens=64000, tools=[tool], tool_choice={"type": "auto"},
                                     messages=messages,
                                     extra_body={"output_config": {"effort": effort}}) as st:

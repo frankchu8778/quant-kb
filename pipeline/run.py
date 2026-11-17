@@ -44,10 +44,12 @@ import random
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 import batch as B
 import kimi_batch as KB
 import judge_fable as jf
+import offpeak
 import trial as T
 import trial_canary as TC
 from common import PIPELINE
@@ -69,6 +71,10 @@ class Stop(Exception):
 
 class Waiting(Exception):
     """第一次寫卡還在 Kimi batch 裡，這篇先停在這裡。"""
+
+
+class OffPeakWait(Exception):
+    """輪到 DeepSeek 的步驟，但現在是尖峰時段。這篇先停在這裡，離峰再接續。"""
 
 
 class Runner:
@@ -95,6 +101,8 @@ class Runner:
                 if self.budget is not None and self.spent >= self.budget:
                     self.stop_reason = f"花費 ¥{self.spent:.2f} 已達預算 ¥{self.budget:.2f}"
                     raise Stop(self.stop_reason)
+            if offpeak.blocked(model):
+                raise OffPeakWait()
             out, meta = call_model(model, prompt, schema)
             cost = self.cost_cny(model, meta.get("usage"))
             with self.lock:
@@ -262,6 +270,10 @@ class Runner:
             rec["state"] = "waiting"
             self.save()
             return rid, "等待 Kimi batch"
+        except OffPeakWait:
+            rec["state"] = "waiting_offpeak"
+            self.save()
+            return rid, f"等離峰（{offpeak.next_offpeak():%H:%M} 起）再做 DeepSeek 檢查"
         except Stop as e:
             rec["state"] = "interrupted"
             self.save()
@@ -284,6 +296,8 @@ def call_model(model, prompt, schema):
     """實際送 API 的唯一入口（測試時替換這個函式）。回傳 (structured output 或 None, meta)。"""
     try:
         res, tail, secs = jf.run_deepseek(prompt, schema, "high", model)  # Kimi 與 DeepSeek 都走 Anthropic 相容端點
+    except offpeak.PeakHours:
+        raise OffPeakWait()   # 跑到一半進入尖峰：不算失敗、不重試，這篇等離峰
     except Exception as e:
         return None, {"error": f"{type(e).__name__}: {str(e)[:300]}", "seconds": 0}
     meta = {"seconds": secs, "usage": (res or {}).get("usage")}
@@ -431,6 +445,28 @@ def cmd_submit(args):
     print("收回：python run.py collect " + args.batch + " --budget N [--wait]")
 
 
+def run_with_offpeak(r, todo, args):
+    """逐篇走流程。DeepSeek 的步驟遇到尖峰就停在那裡；加了 --wait-offpeak 會睡到離峰再接續。
+
+    尖峰時段 Kimi 的步驟（程式檢查不過的重寫）照常做，只有 DeepSeek 的筆記與檢查會等。
+    """
+    for _ in range(4):   # 一天最多跨兩個尖峰時段，4 輪足夠
+        with ThreadPoolExecutor(args.workers) as ex:
+            for rid, status in ex.map(r.process, todo):
+                print(f"{rid}  {status}", flush=True)
+        todo = [rid for rid in todo if r.manifest[rid].get("card", {}).get("state") == "waiting_offpeak"]
+        if not todo:
+            return
+        until = offpeak.next_offpeak()
+        if not getattr(args, "wait_offpeak", False):
+            print(f"\n{len(todo)} 篇停在 DeepSeek 檢查之前：現在是尖峰時段，{until:%H:%M} 起是離峰。"
+                  f"到時候重跑同一個指令即可（或加 --wait-offpeak 讓程式自己等）")
+            return
+        secs = max(0, (until - datetime.now(offpeak.TZ)).total_seconds()) + 30
+        print(f"\n{len(todo)} 篇等離峰：睡到北京時間 {until:%H:%M}（約 {secs / 60:.0f} 分鐘）", flush=True)
+        time.sleep(secs)
+
+
 def collect_one(r, e, info):
     """把一個已結束的 batch 的結果寫回每篇的 kimi_write.json 並記帳。回傳 (成功數, 花費)。"""
     out_dir = B.ROOT / "eval" / e["batch"] / "_kimi_batches"
@@ -504,9 +540,7 @@ def cmd_collect(args):
     if not preflight(chars, None, f"檢查與重寫 {len(todo)} 篇"):
         print("餘額不足：卡片已收回落檔，檢查與重寫先不做。儲值後重跑 collect 即可，不會重複花錢。")
         return
-    with ThreadPoolExecutor(args.workers) as ex:
-        for rid, status in ex.map(r.process, todo):
-            print(f"{rid}  {status}", flush=True)
+    run_with_offpeak(r, todo, args)
     print(f"\n這次即時呼叫花費 ¥{r.spent:.2f}" + (f"；提前停下：{r.stop_reason}" if r.stop_reason else ""))
     cmd_report(args)
 
@@ -528,6 +562,8 @@ def cmd_notes(args):
         return
     if args.budget is None:
         raise SystemExit("真的送出時必須給 --budget")
+    if offpeak.blocked(CHECKER):
+        raise SystemExit(offpeak.message())
     bal = KB.deepseek_balance()
     if bal < est * SAFETY:
         raise SystemExit(f"DeepSeek 餘額 ¥{bal:.2f} 不足（要求 ≥ ¥{est * SAFETY:.2f}），沒有送出")
@@ -538,6 +574,8 @@ def cmd_notes(args):
             out = r.notes(rid, r.fulltext(rid), ev, rec)
         except Stop as e:
             return rid, f"停下：{e}", 0.0
+        except OffPeakWait:
+            return rid, "進入尖峰時段，沒有跑", 0.0
         if out is None:
             return rid, "失敗", rec.get("cost_cny", 0.0)
         (ev / "notes_meta.json").write_text(json.dumps(
@@ -571,9 +609,7 @@ def cmd_cards(args):
         raise SystemExit("真的送出時必須給 --budget")
     if not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇"):
         raise SystemExit("餘額不足，沒有送出")
-    with ThreadPoolExecutor(args.workers) as ex:
-        for rid, status in ex.map(r.process, todo):
-            print(f"{rid}  {status}", flush=True)
+    run_with_offpeak(r, todo, args)
     print(f"\n這次花費 ¥{r.spent:.2f}" + (f"；提前停下：{r.stop_reason}" if r.stop_reason else ""))
     cmd_report(args)
 
@@ -650,6 +686,8 @@ def make_canary(r, rid, card, rec):
 def cmd_canary(args):
     if args.budget is None:
         raise SystemExit("必須給 --budget")
+    if offpeak.blocked(CHECKER):
+        raise SystemExit(offpeak.message())   # 埋雷做了卻不能檢查，Kimi 的改寫就白花了
     r = Runner(args.batch, args.budget)
     d = B.ROOT / "eval" / args.batch / "_canary"
     d.mkdir(parents=True, exist_ok=True)
@@ -693,6 +731,9 @@ def cmd_canary(args):
             print(f"{rid} [{info['type']}] {'抓到' if caught else '沒抓到'}（{res['verdict']}）: {info['desc'][:80]}")
         except Stop as e:
             print(f"停下：{e}")
+            break
+        except OffPeakWait:
+            print(f"停下：{offpeak.message()}")
             break
     print(f"這次花費 ¥{r.spent:.2f}")
 
@@ -788,7 +829,13 @@ def main():
             p.add_argument("--max-wait", type=int, default=180, help="最多等幾分鐘")
         if name == "canary":
             p.add_argument("--every", type=int, default=20)
+        if name in ("collect", "notes", "cards", "canary"):
+            p.add_argument("--allow-peak", action="store_true",
+                           help="允許在 DeepSeek 尖峰時段呼叫（原價）。只在使用者明說可以時才加")
+        if name in ("collect", "cards"):
+            p.add_argument("--wait-offpeak", action="store_true", help="遇到尖峰就睡到離峰再接續 DeepSeek 的步驟")
     args = ap.parse_args()
+    offpeak.allow_from_flag(getattr(args, "allow_peak", False))
     globals()[f"cmd_{args.cmd}"](args)
 
 

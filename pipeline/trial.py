@@ -22,6 +22,7 @@ from types import SimpleNamespace
 import yaml
 
 import judge_fable as jf
+import offpeak
 from common import KB, PIPELINE, load_vocab, vocab_blocks
 from validate import gate_v4
 
@@ -56,6 +57,8 @@ def call(model, prompt, schema, effort):
             try:
                 res, tail, secs = jf.run_deepseek(prompt, schema, effort, model)
                 break
+            except offpeak.PeakHours:
+                raise   # DeepSeek 尖峰時段：不重試，直接停
             except Exception as e:
                 res, tail, secs = None, f"{type(e).__name__}: {str(e)[:300]}", 0.0
     else:
