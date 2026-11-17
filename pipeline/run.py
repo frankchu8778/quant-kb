@@ -38,6 +38,8 @@ batch 模式：只有第一次寫卡走 batch（每篇一個任務，custom_id �
   eval/<batch>/_canary/              埋雷版卡片與檢查結果
 """
 import argparse
+import copy
+import fcntl
 import hashlib
 import json
 import random
@@ -85,6 +87,7 @@ class Runner:
         self.stop_reason = None
         self.ctx = T.ctx()
         self.manifest = B.load()
+        self._saved = {rid: copy.deepcopy(v.get("card")) for rid, v in self.manifest.items()}
 
     # ---- 花費與呼叫 ----
     def cost_cny(self, model, usage):
@@ -133,8 +136,18 @@ class Runner:
         return (B.ROOT / "fulltext" / self.batch / "clean" / f"{rid}.md").read_text()
 
     def save(self):
-        with self.lock:
-            B.save(self.manifest)
+        """只把這個程式改過的卡片紀錄寫回 manifest。
+
+        `cards`（即時）和 `collect`（等 batch）可能同時在跑，各自手上有一份 manifest。
+        整份覆蓋會把對方剛寫的紀錄蓋掉，所以存檔時重新讀檔、只換掉自己改過的篇。
+        """
+        with self.lock, catalog_lock():
+            disk = B.load()
+            for rid, v in self.manifest.items():
+                if v.get("card") != self._saved.get(rid) and rid in disk:
+                    disk[rid]["card"] = copy.deepcopy(v["card"])
+                    self._saved[rid] = copy.deepcopy(v["card"])
+            B.save(disk)
 
     # ---- 各步驟 ----
     def write_prompt(self, rid, fulltext):
@@ -316,11 +329,31 @@ def load_reg():
     return json.loads(REGISTRY.read_text()) if REGISTRY.exists() else []
 
 
+def catalog_lock():
+    """跨程式的檔案鎖：manifest 與 batch 登記簿的「讀檔—合併—寫檔」不會和另一個程式交錯。"""
+    class _Lock:
+        def __enter__(self):
+            REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+            self.f = open(REGISTRY.parent / ".lock", "w")
+            fcntl.flock(self.f, fcntl.LOCK_EX)
+
+        def __exit__(self, *a):
+            fcntl.flock(self.f, fcntl.LOCK_UN)
+            self.f.close()
+    return _Lock()
+
+
 def save_reg(reg):
+    """以 batch id 合併後存檔：手上這份有的條目以手上為準，檔案裡多出來的（別的程式剛送出的）保留。"""
     REGISTRY.parent.mkdir(parents=True, exist_ok=True)
-    tmp = REGISTRY.with_suffix(".tmp")
-    tmp.write_text(json.dumps(reg, ensure_ascii=False, indent=2))
-    tmp.replace(REGISTRY)
+    with catalog_lock():
+        mine = {e["id"]: e for e in reg}
+        disk = load_reg()
+        merged = [mine.pop(e["id"], e) for e in disk] + list(mine.values())
+        tmp = REGISTRY.with_suffix(".tmp")
+        tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2))
+        tmp.replace(REGISTRY)
+    reg[:] = merged
 
 
 def pending(r, batch):
@@ -508,6 +541,7 @@ def cmd_collect(args):
     r = Runner(args.batch, args.budget)
     reg, t_start = load_reg(), time.time()
     while True:
+        save_reg(reg)   # 合併：讀進別的程式剛送出的 batch
         open_entries = [e for e in reg if e["batch"] == args.batch and not e["collected"]]
         for e in open_entries:
             info = KB.retrieve(e["id"])
