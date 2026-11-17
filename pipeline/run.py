@@ -172,6 +172,12 @@ class Runner:
     def notes(self, rid, fulltext, ev, rec):
         p = ev / "notes.json"
         if p.exists():
+            # 筆記可能是 `notes` 指令先跑好的：把那次的花費併進這篇的紀錄（只併一次）
+            meta = ev / "notes_meta.json"
+            if meta.exists() and not any(c["step"] == "notes" for c in rec.get("calls", [])):
+                m = json.loads(meta.read_text())
+                rec.setdefault("calls", []).extend(m["calls"])
+                rec["cost_cny"] = round(rec.get("cost_cny", 0) + m["cost_cny"], 4)
             return json.loads(p.read_text())
         out = self.call(CHECKER, jf.fill((PIPELINE / "judge" / "pass1_prompt.md").read_text(),
                                          strategy_types=self.ctx.st_text, families=self.ctx.fams,
@@ -505,6 +511,47 @@ def cmd_collect(args):
     cmd_report(args)
 
 
+def cmd_notes(args):
+    """先跑檢查員的獨立筆記。筆記只讀全文、不看卡片，所以等 Kimi batch 的時候就能做。
+
+    對象：這個批次還在 Kimi batch 裡的篇，加上接下來會送出的前 --limit 篇（順序和 submit 相同）。
+    只寫 eval/<batch>/<id>/notes.json 與 notes_meta.json，不動 manifest，可以和等待中的 collect 同時跑。
+    """
+    r = Runner(args.batch, args.budget)
+    flying = [rid for e in load_reg() if not e["collected"] and e["batch"] == args.batch for rid in e["rids"]]
+    todo = [rid for rid in flying + pending(r, args.batch)[:args.limit or 0]
+            if not (B.ROOT / "eval" / args.batch / rid / "notes.json").exists()]
+    chars = [r.manifest[rid]["chars_clean"] for rid in todo]
+    est = B.estimate(chars, "kimi", "deepseek")[1] / 2 if chars else 0.0   # 筆記約佔檢查花費的一半
+    print(f"批次 {args.batch}：要先跑筆記 {len(todo)} 篇（batch 中 {len(flying)} 篇），估計 ¥{est:.2f}")
+    if not todo or args.dry_run:
+        return
+    if args.budget is None:
+        raise SystemExit("真的送出時必須給 --budget")
+    bal = KB.deepseek_balance()
+    if bal < est * SAFETY:
+        raise SystemExit(f"DeepSeek 餘額 ¥{bal:.2f} 不足（要求 ≥ ¥{est * SAFETY:.2f}），沒有送出")
+
+    def one(rid):
+        rec, ev = {}, r.paths(rid)[1]
+        try:
+            out = r.notes(rid, r.fulltext(rid), ev, rec)
+        except Stop as e:
+            return rid, f"停下：{e}", 0.0
+        if out is None:
+            return rid, "失敗", rec.get("cost_cny", 0.0)
+        (ev / "notes_meta.json").write_text(json.dumps(
+            {"calls": rec.get("calls", []), "cost_cny": rec.get("cost_cny", 0.0)}, ensure_ascii=False, indent=2))
+        return rid, "完成", rec.get("cost_cny", 0.0)
+
+    t0, total = time.time(), 0.0
+    with ThreadPoolExecutor(args.workers) as ex:
+        for rid, state, cost in ex.map(one, todo):
+            total += cost
+            print(f"  {rid}  {state}  ¥{cost:.3f}", flush=True)
+    print(f"筆記花費 ¥{total:.2f}，耗時 {time.time() - t0:.0f} 秒")
+
+
 def cmd_cards(args):
     r = Runner(args.batch, args.budget, args.dry_run)
     todo = [rid for rid in ready(r.manifest, args.batch)
@@ -718,16 +765,16 @@ def cmd_triage(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["probe", "submit", "collect", "cards", "canary", "report", "review", "triage"]:
+    for name in ["probe", "submit", "collect", "notes", "cards", "canary", "report", "review", "triage"]:
         p = sub.add_parser(name)
         p.add_argument("batch", nargs="?" if name in ("review", "triage") else None)
         if name in ("review", "triage"):
             p.add_argument("--trial", action="store_true", help="用試產 20 篇的資料")
-        if name in ("probe", "submit", "collect", "cards", "canary"):
+        if name in ("probe", "submit", "collect", "notes", "cards", "canary"):
             p.add_argument("--budget", type=float, help="這次執行的花費上限（人民幣）")
-        if name in ("cards", "collect"):
+        if name in ("cards", "collect", "notes"):
             p.add_argument("--workers", type=int, default=5)
-        if name in ("cards", "submit"):
+        if name in ("cards", "submit", "notes"):
             p.add_argument("--limit", type=int, help="只處理前 N 篇")
             p.add_argument("--dry-run", action="store_true", help="只列出會做什麼，不送出")
         if name == "probe":

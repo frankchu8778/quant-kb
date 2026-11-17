@@ -189,6 +189,16 @@ python run.py collect batch1 --budget 60 --wait
 - `--wait` 會每 2 分鐘查一次，最多等 `--max-wait` 分鐘（預設 180）。不加就只查一次。**完成後要盡快收回**，結果檔保留多久官方沒寫。
 - 中斷後重跑同一個指令即可，不重複花錢。
 
+等 batch 的時候可以先跑檢查員的獨立筆記。筆記只讀全文、不看卡片，不必等 Kimi：
+
+```bash
+python run.py notes batch1 --budget 5
+```
+
+- 對象是還在 Kimi batch 裡的篇；加 `--limit N` 會再包含接下來要送出的前 N 篇（順序和 `submit` 相同）。
+- 只寫 `eval/<batch>/<id>/notes.json` 與 `notes_meta.json`，不動 manifest，可以和等待中的 `collect` 同時跑。`collect` 處理到該篇時會直接用，並把花費併進紀錄。
+- 實測每篇約 ¥0.22、5 篇同時跑約 2 分鐘。
+
 ### 格式試打
 
 ```bash
