@@ -9,11 +9,13 @@
   python batch.py clean   <batch>                 # 階段 2：去固定頁
   python batch.py status  <batch> [--budget 300]  # 各階段篇數、hold 原因、寫卡與檢查的花費估算
   python batch.py release <batch> <id> [<id> ...] # 人工確認後解除 hold，回到被擋下之前的階段
+  python batch.py holds   <batch>                 # 列出被擋下的篇，並把它們的 PDF 移到 hold/<batch>/
 
 每個指令都可以重跑：已完成的篇會跳過，只處理還沒做的。
 
 路徑：
   inbox/<batch>/*.pdf                       原始 PDF（不進 git）
+  hold/<batch>/                             被擋下的篇：PDF 移到這裡，另有一份「待處理清單.md」寫明原因
   catalog/manifest.json                     每篇的狀態、來源檔、各階段結果（全庫共用，跨批次去重）
   catalog/fingerprints.json                 每篇的內容指紋（全庫共用，跨批次比對重複）
   pipeline/_mineru_raw/<batch>/<tier>/      MinerU 原始輸出（不修改）
@@ -138,6 +140,45 @@ def nearest(sig, fp, kind, exclude):
 def hold(v, reason):
     """擋下一篇並記住它原本在哪個階段，release 時回得去。"""
     v.update(hold_from=v["status"], status="hold", hold_reason=reason)
+
+
+def sync_holds(m, batch):
+    """讓 hold/<batch>/ 和 manifest 一致：被擋下的 PDF 移進去、放行的移回 inbox，並重寫待處理清單。"""
+    inbox, hdir = ROOT / "inbox" / batch, ROOT / "hold" / batch
+    rows = []
+    for rid, v in of_batch(m, batch).items():
+        src, parked = inbox / v["source_pdf"], hdir / v["source_pdf"]
+        if v["status"] == "hold":
+            hdir.mkdir(parents=True, exist_ok=True)
+            if src.exists() and not parked.exists():
+                src.rename(parked)
+            md = ROOT / "fulltext" / batch / v.get("tier", "standard") / f"{rid}.md"
+            rows.append((rid, v, md if md.exists() else None))
+        elif parked.exists() and not src.exists():
+            parked.rename(src)   # 已放行：PDF 移回去
+    if not hdir.exists():
+        return 0
+    lines = [f"# 批次 {batch}：被擋下、等你決定的研報", "",
+             f"更新時間：{time.strftime('%Y-%m-%d %H:%M')}。共 {len(rows)} 篇。PDF 就在這個資料夾裡。", "",
+             "- 要放行：`python batch.py release " + batch + " <id>`（PDF 會移回 inbox，接著往下處理）",
+             "- 不處理：留著不動即可，不會進到花錢的階段", ""]
+    for rid, v, md in rows:
+        lines += [f"## {v['source_pdf']}", "", f"- id：`{rid}`", f"- 原因：{v['hold_reason']}",
+                  f"- 在哪一步被擋：{v['hold_from']}；頁數 {v.get('pages')}；轉出的全文 {v.get('chars_raw', '（尚未轉檔）')} 字"]
+        if md:
+            lines.append(f"- 轉出的全文：`{md.relative_to(ROOT)}`")
+        lines.append("")
+    (hdir / "待處理清單.md").write_text("\n".join(lines))
+    return len(rows)
+
+
+def cmd_holds(args):
+    m = load()
+    n = sync_holds(m, args.batch)
+    for rid, v in of_batch(m, args.batch).items():
+        if v["status"] == "hold":
+            print(f"hold {rid}  {v['source_pdf'][:50]}\n     → {v['hold_reason']}")
+    print(f"共 {n} 篇，PDF 與清單在 {ROOT / 'hold' / args.batch}")
 
 
 def head_text(pdf):
@@ -336,9 +377,12 @@ def report_holds(m, held):
     """把新擋下的篇醒目地印出來（同時寫到 stderr，排程或背景執行時也看得到）。"""
     if not held:
         return
+    batch = m[held[0]]["batch"]
+    sync_holds(m, batch)
     lines = [f"⚠️  有 {len(held)} 篇被擋下（hold），需要你確認："] + \
             [f"   {rid}  {m[rid]['source_pdf'][:50]}\n      → {m[rid]['hold_reason']}" for rid in held] + \
-            ["   確認不是問題的，用 `python batch.py release <batch> <id>` 放行。"]
+            [f"   PDF 已移到 {ROOT / 'hold' / batch}，原因寫在裡面的「待處理清單.md」。",
+             "   確認不是問題的，用 `python batch.py release <batch> <id>` 放行。"]
     print("\n".join(lines))
     print(f"HOLD {len(held)}", file=sys.stderr)
 
@@ -382,6 +426,7 @@ def cmd_release(args):
         del v["hold_from"]
         print(f"放行 {rid} → {nxt}")
     save(m)
+    sync_holds(m, args.batch)
 
 
 def quality_problems(text, pages):
@@ -490,7 +535,7 @@ def cmd_status(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["sample", "ingest", "convert", "dedup", "quality", "clean", "status", "release"]:
+    for name in ["holds", "sample", "ingest", "convert", "dedup", "quality", "clean", "status", "release"]:
         p = sub.add_parser(name)
         p.add_argument("batch")
         if name == "convert":

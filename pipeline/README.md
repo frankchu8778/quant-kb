@@ -91,10 +91,16 @@ python batch.py dedup batch1
 
 ### 被 hold 之後
 
-每個指令結束時會列出這次新擋下的篇和原因；`status` 會列出全部。確認不是問題的：
+每個指令結束時會列出這次新擋下的篇和原因；`status` 會列出全部。被擋下的篇，PDF 會從 `inbox/<batch>/` 移到 **`hold/<batch>/`**，同一個資料夾裡的「待處理清單.md」寫明每篇的原因。確認不是問題的：
 
 ```bash
 python batch.py release batch1 <id> [<id> ...]
+```
+
+PDF 會移回 `inbox/`。要重新整理 hold 資料夾與清單：
+
+```bash
+python batch.py holds batch1
 ```
 
 會回到被擋下之前的階段繼續往下走，不會再被同一道檢查擋。放行紀錄留在 manifest 的 `released`。確定是重複的就不用處理，維持 hold 即可。
