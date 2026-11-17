@@ -530,9 +530,11 @@ def cmd_collect(args):
             print(f"已等 {args.max_wait} 分鐘，先停下；之後重跑 collect 即可")
             break
         time.sleep(args.poll)
-    # 接續：所有已有第一次寫卡結果、但還沒走完的篇
+    # 接續：從 batch 收回、但還沒走完的篇。只碰 batch 的篇，避免和同時在跑的 `cards`（即時）搶同一篇
+    from_batch = {rid for e in reg if e["batch"] == args.batch and e["collected"] for rid in e["rids"]}
     todo = [rid for rid in ready(r.manifest, args.batch)
-            if r.manifest[rid].get("card", {}).get("state") not in ("passed", "escalate", "error")
+            if rid in from_batch
+            and r.manifest[rid].get("card", {}).get("state") not in ("passed", "escalate", "error")
             and (B.ROOT / "eval" / args.batch / rid / "kimi_write.json").exists()]
     if not todo:
         return
@@ -592,8 +594,10 @@ def cmd_notes(args):
 
 def cmd_cards(args):
     r = Runner(args.batch, args.budget, args.dry_run)
+    flying = {rid for e in load_reg() if not e["collected"] for rid in e["rids"]}   # 還在 batch 裡的篇不碰
     todo = [rid for rid in ready(r.manifest, args.batch)
-            if r.manifest[rid].get("card", {}).get("state") not in ("passed", "escalate")]
+            if r.manifest[rid].get("card", {}).get("state") not in ("passed", "escalate")
+            and rid not in flying]
     if args.limit:
         todo = todo[:args.limit]
     chars = [r.manifest[rid]["chars_clean"] for rid in todo]
