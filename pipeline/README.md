@@ -149,7 +149,7 @@ python batch.py status batch1 --budget 300
 
 ### 送出前一定會做的餘額檢查
 
-`submit`、`collect`、`probe`、`cards`、`canary` 在送出任何付費請求之前，都會先：
+`submit`、`collect`、`probe`、`notes`、`cards`、`canary` 在送出任何付費請求之前，都會先：
 
 1. 用這批每篇的**實際字數**估這一步要花多少（Kimi：第一次寫卡 ＋ 兩成五的篇數即時重寫；DeepSeek：筆記與檢查以尖峰價計 ＋ 兩成複檢）。
 2. 即時查兩個平台的餘額。
@@ -162,6 +162,24 @@ python batch.py status batch1 --budget 300
 ```
 
 加 `--dry-run` 只印這張表和任務清單，不上傳、不建立 batch。
+
+### DeepSeek 尖峰時段不呼叫
+
+**北京時間週一至週五（不含中國法定節假日）9:00–12:00、14:00–18:00 是 DeepSeek 的尖峰時段（原價），這段時間不准呼叫 DeepSeek 的模型，除非使用者同意。** 其餘時間是離峰（半價）。
+
+- 閘門在最底層（`offpeak.guard`，所有 DeepSeek 呼叫都經過 `judge_fable.run_deepseek`），尖峰時在連線之前就擋下。Kimi 不受影響。
+- 尖峰開始前 5 分鐘（8:55、13:55）就不再送新請求，避免一次呼叫跨進尖峰。
+- 法定節假日列在 `cn_holidays.txt`，**每年 11 月國務院公布隔年安排後要補上**。沒列到的平日一律當成尖峰，所以漏列只會多擋。調休補班日都在週末，週末本來就是離峰，不用另外處理。
+- 遇到尖峰時：
+  - `collect`、`cards`：Kimi 的步驟照做，卡片停在 DeepSeek 檢查之前，狀態記成 `waiting_offpeak`。之後重跑同一個指令即可接續；加 `--wait-offpeak` 會讓程式自己睡到離峰再接續。
+  - `notes`、`canary`：直接不跑，並印出幾點起是離峰。
+- 放行只有一個方法：該次指令加 `--allow-peak`，只影響這一次執行。**只在使用者當下明說可以時才加**，之前的同意不延續。
+- 查餘額不是模型呼叫、不計費，不受限制。
+- 記帳目前仍以尖峰價計算，離峰的實際花費約為記帳的一半；以餘額變化為準。
+
+```
+現在是 DeepSeek 尖峰時段（北京時間 11-17 Tue 14:42），不呼叫；18:00 起是離峰。要在尖峰跑必須由使用者同意，並在指令加 --allow-peak
+```
 
 ### 流程：Kimi batch
 
@@ -258,6 +276,7 @@ python run.py review batch1
 | `batch.py` | 本機階段：入庫、轉檔、重複性檢查、品質閘、去固定頁、狀態、放行 |
 | `run.py` | 模型階段：batch 送出與收回、檢查、退回重寫、餘額檢查、埋雷、結果統計、人工複核表 |
 | `kimi_batch.py` | Kimi 的 OpenAI 格式介面：batch 任務、即時呼叫、餘額查詢 |
+| `offpeak.py`、`cn_holidays.txt` | DeepSeek 尖峰時段的閘門與中國法定節假日清單 |
 | `clean.py` | 去固定頁的規則 |
 | `validate.py` | 程式硬檢查 `gate_v4`：schema、引文在全文、數字在同列引文 |
 | `card_prompt_v3.md` | 寫卡 prompt（每個方法步驟附引文與章節） |
