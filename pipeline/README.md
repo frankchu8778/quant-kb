@@ -264,6 +264,7 @@ python run.py review batch1
 - **POC 與試產的卡片用的是 basic 等級的全文**（`fulltext/poc/clean-v2` 是從 `basic` 清出來的），不是 standard。新批次預設用 standard，行內公式的寫法會不同（`$R^{2}$` 對 `$R ^ { 2 }$`）。第一批跑完要確認程式檢查的引文比對通過率沒有掉。
 - Kimi 的 batch 只有 OpenAI 格式（`/v1/files` ＋ `/v1/batches`），Anthropic 相容端點沒有 batch；DeepSeek 沒有 batch 介面，離峰半價是依時段自動計算。
 - Kimi 的 OpenAI 格式要求工具參數的每個欄位都明寫 `type`，只有 `enum` 的欄位會被拒絕（`kimi_batch.moonshot_schema` 會補上）。
+- **Kimi batch 在這個帳號上沒有產出過任何結果**（2026-11-17～18）：4 個 batch（5 篇、20 篇、兩個只問「1+1」的測試，分別用 `kimi-k3.1-pro` 與 `kimi-k3`）都在送出後一分鐘內轉成 `in_progress`，之後完成數一直是 0，沒有失敗也沒有錯誤；最舊的一個超過 12 小時期限仍未轉成 `expired`。格式、模型、請求大小都排除了，推斷是 Kimi 端或帳號的問題，待客服回覆。在那之前寫卡走即時（`run.py cards`）。
 - DeepSeek 偶爾回傳壞掉的 JSON，`trial.py` 會重試 3 次。
 - Kimi 每篇約 6 分鐘，5 並行跑 200 篇約 4 小時。
 - `trial_canary.py`（試產用）的邏輯類埋雷用 Opus 產生，會用到 Claude 訂閱額度；量產的 `run.py canary` 已改用 Kimi。
