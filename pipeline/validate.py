@@ -1,4 +1,5 @@
 """卡片的自動檢查：schema、詞彙表、數字與引用能否在全文中找到（V3 的自動項目）。"""
+import html
 import re
 
 from rapidfuzz import fuzz
@@ -34,9 +35,17 @@ def validate_card(card, vocab):
     return errs
 
 
+HTML_TAG_RE = re.compile(r"</?[a-zA-Z][a-zA-Z0-9]*(?:\s[^<>]*)?/?>")
+
+
 def _norm(s):
-    """比對用正規化：去空白與常見標點差異。"""
-    return re.sub(r"[\s　，,。．.：:；;、（）()\[\]【】\"'“”‘’%％\-—_*$\\{}]", "", s or "")
+    """比對用正規化：去 HTML 標籤與實體、空白與常見標點差異。
+
+    MinerU 的全文用 HTML 表示表格（<td>）與底線、粗體（<u>、<strong>），寫卡模型引用時不會照抄標籤；
+    表格的引文常寫成 Markdown 的 | 分隔，所以 | 也當標點去掉。先去標籤再解實體，&lt; 才不會被當成標籤。
+    """
+    s = html.unescape(HTML_TAG_RE.sub("", s or ""))
+    return re.sub(r"[\s　，,。．.：:；;、（）()\[\]【】\"'“”‘’%％\-—_*$\\{}|｜]", "", s)
 
 
 def quote_found(quote, fulltext_norm, threshold=90):
