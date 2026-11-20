@@ -148,6 +148,12 @@ def retrieve(batch_id):
         return _json(c.get(f"/batches/{batch_id}"))
 
 
+def batch_errors(info):
+    """整個 batch 被拒的原因（例如建立後驗證時餘額不足）；沒有就回空字串。這種失敗沒有結果檔，request_counts 也全是 0。"""
+    data = (info.get("errors") or {}).get("data") or []
+    return "；".join(d.get("message", "") for d in data if d.get("message"))
+
+
 def download(file_id):
     with _client(300) as c:
         r = c.get(f"/files/{file_id}/content")

@@ -17,6 +17,7 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 | 2 去固定頁 | `batch.py clean <batch>` | 否 | 可用 |
 | — 預算確認 | `batch.py status <batch> --budget N` | 否 | 可用 |
 | 4 第一次寫卡（Kimi batch，六折） | `run.py submit <batch> --limit N --budget X` | **是** | 見下方 |
+| — 查 batch 狀態 | `run.py status <batch>` | 否 | 可用 |
 | 5–6b 收回、檢查、退回重寫再複檢 | `run.py collect <batch> --budget X --wait` | **是** | 見下方 |
 | — 格式試打 | `run.py probe <batch> --budget 5` | **是**（約 ¥1.3） | 見下方 |
 | — 備援：全部走即時 | `run.py cards <batch> --budget X` | **是**（原價） | 用假資料測過 |
@@ -200,6 +201,8 @@ python run.py submit batch1 --limit 20 --budget 60
 - 每篇研報是 JSONL 裡的一行、一個任務，`custom_id` 就是研報 id。每個 batch 最多 20 篇（`--chunk`）。
 - 送出的 JSONL 存在 `eval/<batch>/_kimi_batches/`，每個 batch 的 id、任務清單、狀態記在 `catalog/kimi_batches.json`。
 - 已經送出、還沒收回的篇不會重複送。
+- 送出後會等 Kimi 驗證（最多 2 分鐘）。Kimi 驗證時就檢查餘額，不夠整個 batch 直接 `failed`、沒有結果檔：程式會印出原因、這個 batch 結案、篇放回待送，後面的 batch 不再送。所以要先儲值才送，沒有「先送、之後再儲值」。
+- `run.py status <batch>` 隨時查（不花錢）；驗證得比較久、之後才被拒的，也在這裡或 collect 時結案。
 
 ```bash
 python run.py collect batch1 --budget 60 --wait

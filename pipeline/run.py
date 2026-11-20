@@ -3,6 +3,7 @@
 用法（<batch> 要先跑完 batch.py 的本機階段）：
   python run.py probe   <batch> --budget 5                # 用 batch 的請求格式即時試打 1 篇，驗證格式
   python run.py submit  <batch> --limit 5 --budget 60 [--dry-run]   # 第一次寫卡送進 Kimi batch（六折），每 20 篇一個 batch
+  python run.py status  <batch>                           # 查還沒收回的 batch（不花錢）；被 Kimi 整個拒絕的會結案、篇放回待送
   python run.py collect <batch> --budget 60 [--wait]      # 收回完成的 batch，接著做程式檢查、模型檢查、重寫
   python run.py cards  <batch> --budget 150 [--dry-run]   # 備援：全部走即時 API（原價）
   python run.py canary <batch> --budget 20 [--every 20]   # 在通過的卡上埋雷，量檢查員的抓到率
@@ -479,10 +480,9 @@ def cmd_submit(args):
             print(f"  batch {i + 1}: {len(ch)} 篇，例如 {ch[0]}")
         print("（--dry-run：沒有上傳、沒有建立任何 batch）")
         return
-    if not ok and not args.dry_run:
-        if not args.ignore_balance:
-            raise SystemExit("餘額不足，沒有送出任何 batch（使用者明說可以先送、之後再儲值，才加 --ignore-balance）")
-        print("!! 餘額不足，但加了 --ignore-balance：照樣送出。收回前要儲值，否則 batch 可能失敗或收回後的檢查停下")
+    if not ok:
+        # 沒有「先送、之後再儲值」這條路：Kimi 建立 batch 後驗證時就檢查餘額，不夠整個 batch 直接 failed
+        raise SystemExit("餘額不足，沒有送出任何 batch（Kimi 驗證時就會因餘額不足把 batch 判失敗，要先儲值）")
     if args.budget is None:
         raise SystemExit("真的送出時必須給 --budget")
     if est > args.budget:
@@ -509,7 +509,17 @@ def cmd_submit(args):
         for rid in ch:
             r.manifest[rid].setdefault("card", {"state": "new"})["state"] = "waiting"
         r.save()
-        print(f"  已送出 batch {i + 1}/{len(chunks)}：{info['id']}（{len(ch)} 篇，狀態 {info.get('status')}）")
+        print(f"  已送出 batch {i + 1}/{len(chunks)}：{info['id']}（{len(ch)} 篇），等 Kimi 驗證…", flush=True)
+        info = wait_validated(info["id"])
+        e = reg[-1] if reg[-1]["id"] == info["id"] else next(x for x in reg if x["id"] == info["id"])
+        e["status"] = info.get("status")
+        if batch_failed(info):
+            reason = mark_batch_failed(r, e, info)
+            save_reg(reg)
+            raise SystemExit(f"!! batch {info['id']} 被 Kimi 拒絕：{reason}\n"
+                             f"   這 {len(ch)} 篇已放回待送；後面 {len(chunks) - i - 1} 個 batch 沒有送。處理後重跑 submit")
+        save_reg(reg)
+        print(f"    狀態 {info.get('status')}" + ("（還在驗證，之後用 `run.py status` 查）" if info.get("status") == "validating" else ""))
     print("收回：python run.py collect " + args.batch + " --budget N [--wait]")
 
 
@@ -576,6 +586,53 @@ def collect_one(r, e, info):
     return n_ok, cost_total
 
 
+def wait_validated(batch_id, secs=120, poll=10):
+    """Kimi 建立 batch 後先驗證（格式、餘額）；等到離開 validating 或等滿 secs 秒，回傳最新狀態。"""
+    t, info = time.time(), KB.retrieve(batch_id)
+    while info.get("status") == "validating" and time.time() - t < secs:
+        time.sleep(poll)
+        info = KB.retrieve(batch_id)
+    return info
+
+
+def batch_failed(info):
+    """整個 batch 沒跑：已結束、卻沒有任何結果檔（驗證失敗、取消、過期前一篇都沒做）。"""
+    return (info.get("status") not in KB.OPEN_STATUS and info.get("status") != "completed"
+            and not info.get("output_file_id") and not info.get("error_file_id"))
+
+
+def mark_batch_failed(r, e, info):
+    """把整個沒跑的 batch 結案：不記任何篇寫卡失敗、不記帳，篇放回待送（pending 會再撿到）。回傳原因。"""
+    reason = KB.batch_errors(info) or f"狀態 {info.get('status')}，沒有任何結果檔"
+    e.update(status=info.get("status"), collected=True, failed=True, failure=reason, ok=0, cost_cny=0.0,
+             finished_at=time.strftime("%Y-%m-%d %H:%M:%S"))
+    for rid in e["rids"]:
+        rec = r.manifest[rid].get("card")
+        if rec and rec.get("state") == "waiting":
+            rec["state"] = "new"
+    r.save()
+    return reason
+
+
+def cmd_status(args):
+    """查還沒收回的 batch 現在的狀態（不花錢）；整個被拒的直接結案、篇放回待送。"""
+    r = Runner(args.batch, None)
+    reg = load_reg()
+    open_entries = [e for e in reg if e["batch"] == args.batch and not e["collected"]]
+    if not open_entries:
+        print(f"批次 {args.batch}：沒有還沒收回的 batch")
+    for e in open_entries:
+        info = KB.retrieve(e["id"])
+        e["status"], e["request_counts"] = info.get("status"), info.get("request_counts")
+        age = (time.time() - e["created_ts"]) / 60
+        if batch_failed(info):
+            print(f"!! {e['id']}（{len(e['rids'])} 篇）被 Kimi 拒絕：{mark_batch_failed(r, e, info)}；篇已放回待送")
+        else:
+            print(f"  {e['id']}（{len(e['rids'])} 篇）：{e['status']} {e.get('request_counts')}，已等 {age:.0f} 分鐘"
+                  + ("，可以 collect 了" if e["status"] not in KB.OPEN_STATUS else ""))
+    save_reg(reg)
+
+
 def cmd_collect(args):
     if args.budget is None:
         raise SystemExit("必須給 --budget（收回後的檢查與重寫會花錢）")
@@ -588,6 +645,10 @@ def cmd_collect(args):
             info = KB.retrieve(e["id"])
             e["status"], e["request_counts"] = info.get("status"), info.get("request_counts")
             if info.get("status") in KB.OPEN_STATUS:
+                continue
+            if batch_failed(info):
+                print(f"!! {e['id']}（{len(e['rids'])} 篇）被 Kimi 拒絕：{mark_batch_failed(r, e, info)}；"
+                      f"篇已放回待送，處理後重跑 submit", flush=True)
                 continue
             n_ok, cost = collect_one(r, e, info)
             e.update(collected=True, finished_at=time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -923,7 +984,7 @@ def cmd_triage(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ["probe", "submit", "collect", "notes", "cards", "canary", "report", "review", "triage"]:
+    for name in ["probe", "submit", "status", "collect", "notes", "cards", "canary", "report", "review", "triage"]:
         p = sub.add_parser(name)
         p.add_argument("batch", nargs="?" if name in ("review", "triage") else None)
         if name in ("review", "triage"):
@@ -944,8 +1005,6 @@ def main():
         if name == "submit":
             p.add_argument("--chunk", type=int, default=20, help="每個 batch 最多幾篇")
             p.add_argument("--window", default="12h", help="completion_window，最短 12h")
-            p.add_argument("--ignore-balance", action="store_true",
-                           help="餘額預檢不過也送（只在使用者明說之後會儲值時才加）")
         if name == "collect":
             p.add_argument("--wait", action="store_true", help="等到所有 batch 完成")
             p.add_argument("--poll", type=int, default=120, help="每隔幾秒查一次")
