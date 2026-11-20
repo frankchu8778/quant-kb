@@ -23,6 +23,11 @@ batch 模式：只有第一次寫卡走 batch（每篇一個任務，custom_id �
 程式檢查不過的重寫、檢查員退回的重寫走即時，免得每篇要等好幾輪。
 送出前會查兩個平台的餘額，任一邊低於這一步估計花費的 1.3 倍就不送。
 
+監控（monitor.py）：每做完一篇重算程式檢查通過率、退回率、升級率、失敗率、埋雷漏抓率；
+  超過警戒就不再開始新的篇（已在跑的做完），之後重跑也會先擋下，處理過再加 --ignore-alarms。
+  cards / collect 跑完會自動在新通過的卡上埋雷（每 20 張 1 個）、抽 5% 給 MiniMax 審計；
+  不要的話加 --no-canary / --no-audit。
+
 保護措施：
   --budget   這次執行的花費上限（人民幣）。每次呼叫前檢查，超過就不再送新的請求。
   餘額不足   API 回 402 時整批立刻停下。
@@ -51,6 +56,7 @@ from datetime import datetime
 import batch as B
 import kimi_batch as KB
 import judge_fable as jf
+import monitor
 import offpeak
 import trial as T
 import trial_canary as TC
@@ -58,6 +64,8 @@ from common import PIPELINE
 from validate import gate_v4
 
 WRITER, CHECKER = "kimi-k3.1-pro", "deepseek-flash"
+CANARY_EVERY = 20   # 量產時每 20 張通過的卡埋 1 個雷
+AUDIT_PCT = 5       # 量產時抽 5% 通過的卡審計（PLAN：前 200 篇 5%，漏抓率穩定後降到 2%）
 PRICE_CNY = {"kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8), "MiniMax": (1.1, 4.3)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
 RETRY_WAITS = [10, 30, 90]
 BILLING_HINTS = ("402", "insufficient balance", "billing")
@@ -85,6 +93,8 @@ class Runner:
         self.spent = 0.0
         self.lock = threading.Lock()
         self.stop_reason = None
+        self.alarm = None            # 監控警報（monitor.py）：有值就不再開始新的篇
+        self.ignore_alarms = False
         self.ctx = T.ctx()
         self.manifest = B.load()
         self._saved = {rid: copy.deepcopy(v.get("card")) for rid, v in self.manifest.items()}
@@ -222,6 +232,8 @@ class Runner:
         rec = v.setdefault("card", {"state": "new"})
         if rec["state"] in ("passed", "escalate"):
             return rid, rec["state"] + "（已完成）"
+        if self.alarm:
+            return rid, "沒開始：監控警報"
         cards, ev = self.paths(rid)
         fulltext = self.fulltext(rid)
         final, v1 = cards / f"{rid}.json", cards / f"{rid}.v1.json"
@@ -292,6 +304,17 @@ class Runner:
             self.save()
             return rid, f"停下：{e}"
 
+    def check_alarms(self):
+        """重算監控指標；超標就設 self.alarm，之後不再開始新的篇。回傳警報清單。"""
+        if self.ignore_alarms:
+            return []
+        with self.lock:
+            found = monitor.alarms(self.manifest, self.batch)
+            if found and not self.alarm:
+                self.alarm = "；".join(f"{a[0]} {a[1]}" for a in found)
+                print(f"\n!! 監控警報：{self.alarm}\n!! 不再開始新的篇，已經在跑的會做完", flush=True)
+        return found
+
     def finish(self, rid, rec, state, reason=None):
         rec["state"] = state
         if reason:
@@ -299,6 +322,7 @@ class Runner:
         else:
             rec.pop("reason", None)
         self.save()
+        self.check_alarms()
         return rid, state + (f"：{reason}" if reason else "") + f"  ¥{rec.get('cost_cny', 0):.2f}"
 
 
@@ -485,7 +509,13 @@ def run_with_offpeak(r, todo, args):
 
     尖峰時段 Kimi 的步驟（程式檢查不過的重寫）照常做，只有 DeepSeek 的筆記與檢查會等。
     """
+    r.ignore_alarms = getattr(args, "ignore_alarms", False)
+    if r.check_alarms():
+        print("開始前就有監控警報，這次不處理任何篇。看過、處理過之後要繼續，加 --ignore-alarms")
+        return
     for _ in range(4):   # 一天最多跨兩個尖峰時段，4 輪足夠
+        if r.alarm:
+            return
         with ThreadPoolExecutor(args.workers) as ex:
             for rid, status in ex.map(r.process, todo):
                 print(f"{rid}  {status}", flush=True)
@@ -579,6 +609,7 @@ def cmd_collect(args):
         print("餘額不足：卡片已收回落檔，檢查與重寫先不做。儲值後重跑 collect 即可，不會重複花錢。")
         return
     run_with_offpeak(r, todo, args)
+    followups(r, args)
     print(f"\n這次即時呼叫花費 ¥{r.spent:.2f}" + (f"；提前停下：{r.stop_reason}" if r.stop_reason else ""))
     cmd_report(args)
 
@@ -650,6 +681,7 @@ def cmd_cards(args):
     if not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇"):
         raise SystemExit("餘額不足，沒有送出")
     run_with_offpeak(r, todo, args)
+    followups(r, args)
     print(f"\n這次花費 ¥{r.spent:.2f}" + (f"；提前停下：{r.stop_reason}" if r.stop_reason else ""))
     cmd_report(args)
 
@@ -686,6 +718,9 @@ def cmd_report(args):
         for typ in sorted({c["type"] for c in cs}):
             sub = [c for c in cs if c["type"] == typ]
             print(f"  埋雷 {typ}：抓到 {sum(c['caught'] for c in sub)}/{len(sub)}")
+    print("監控：")
+    for line in monitor.summary(m, args.batch):
+        print(line)
 
 
 # ---- 埋雷（持續監控檢查員）----
@@ -729,24 +764,34 @@ def cmd_canary(args):
     if offpeak.blocked(CHECKER):
         raise SystemExit(offpeak.message())   # 埋雷做了卻不能檢查，Kimi 的改寫就白花了
     r = Runner(args.batch, args.budget)
-    d = B.ROOT / "eval" / args.batch / "_canary"
+    canary_round(r, args.batch, args.every)
+    print(f"這次花費 ¥{r.spent:.2f}")
+
+
+def canary_round(r, batch, every):
+    """在還沒埋過雷的通過卡上，每 every 張埋 1 張（依 id 雜湊固定抽樣），送檢查員。回傳這次做了幾個。"""
+    d = B.ROOT / "eval" / batch / "_canary"
     d.mkdir(parents=True, exist_ok=True)
     path = d / "_canaries.json"
     canaries = json.loads(path.read_text()) if path.exists() else []
     done = {c["rid"] for c in canaries}
     passed = sorted(rid for rid, v in r.manifest.items()
-                    if v["batch"] == args.batch and v.get("card", {}).get("state") == "passed")
+                    if v["batch"] == batch and v.get("card", {}).get("state") == "passed")
     # 依 id 的雜湊固定抽樣：每 every 張抽 1 張，重跑會抽到同一批
-    picks = [rid for rid in passed if int(hashlib.sha1(rid.encode()).hexdigest(), 16) % args.every == 0 and rid not in done]
-    print(f"通過的卡 {len(passed)} 張，這次埋雷 {len(picks)} 張（每 {args.every} 張 1 張；已做過 {len(done)} 張）")
+    picks = [rid for rid in passed if int(hashlib.sha1(rid.encode()).hexdigest(), 16) % every == 0 and rid not in done]
+    print(f"埋雷：通過的卡 {len(passed)} 張，這次埋 {len(picks)} 張（每 {every} 張 1 張；已做過 {len(done)} 張）")
+    if not picks:
+        return 0
     # 邏輯類埋雷要 Kimi 改寫一小段（約 ¥0.4），每個埋雷要 DeepSeek 檢查一次（尖峰約 ¥0.15）
-    if picks and not preflight([], None, f"埋雷 {len(picks)} 張", kimi_extra=0.4 * len(picks) / 3, ds_extra=0.15 * len(picks)):
-        raise SystemExit("餘額不足，沒有送出")
+    if not preflight([], None, f"埋雷 {len(picks)} 張", kimi_extra=0.4 * len(picks) / 3, ds_extra=0.15 * len(picks)):
+        print("餘額不足，埋雷沒有送出")
+        return 0
+    n = 0
     for rid in picks:
         rec = {}
         try:
             fulltext = r.fulltext(rid)
-            card = json.loads((B.ROOT / "cards" / args.batch / f"{rid}.json").read_text())
+            card = json.loads((B.ROOT / "cards" / batch / f"{rid}.json").read_text())
             info = make_canary(r, rid, card, rec)
             if not info:
                 print(f"{rid}: 做不出埋雷")
@@ -755,7 +800,7 @@ def cmd_canary(args):
                 print(f"{rid}: 埋雷會被程式檢查擋下，不算（{info['type']}）")
                 continue
             (d / f"{rid}.json").write_text(json.dumps(card, ensure_ascii=False, indent=2))
-            notes = json.loads((B.ROOT / "eval" / args.batch / rid / "notes.json").read_text())
+            notes = json.loads((B.ROOT / "eval" / batch / rid / "notes.json").read_text())
             res = r.check(rid, fulltext, card, notes, rec, "canary-check")
             if res is None:
                 print(f"{rid}: 檢查失敗")
@@ -768,6 +813,7 @@ def cmd_canary(args):
             canaries.append({"rid": rid, **info, "verdict": res["verdict"], "caught": caught,
                              "cost_cny": rec.get("cost_cny", 0)})
             path.write_text(json.dumps(canaries, ensure_ascii=False, indent=2))
+            n += 1
             print(f"{rid} [{info['type']}] {'抓到' if caught else '沒抓到'}（{res['verdict']}）: {info['desc'][:80]}")
         except Stop as e:
             print(f"停下：{e}")
@@ -775,7 +821,26 @@ def cmd_canary(args):
         except OffPeakWait:
             print(f"停下：{offpeak.message()}")
             break
-    print(f"這次花費 ¥{r.spent:.2f}")
+    return n
+
+
+def followups(r, args):
+    """一輪寫卡／檢查之後：在新通過的卡上埋雷、抽樣審計，再看一次監控。"""
+    if r.alarm or r.stop_reason:
+        print("有警報或已提前停下：這次不做埋雷與審計")
+        return
+    if not getattr(args, "no_canary", False):
+        if offpeak.blocked(CHECKER):
+            print("埋雷要 DeepSeek 檢查，現在是尖峰：這次不做，下次跑同一個指令會補上")
+        else:
+            canary_round(r, args.batch, CANARY_EVERY)
+            r.check_alarms()
+    if not getattr(args, "no_audit", False) and not r.stop_reason:
+        import audit
+        left = None if r.budget is None else max(0.0, r.budget - r.spent)
+        flagged = audit.stream_round(args.batch, AUDIT_PCT, left)
+        if flagged:
+            print(f"審計有 {flagged} 張和檢查員不一致：跑 `python audit.py review {args.batch}`，人工看複核表")
 
 
 # ---- 人工複核表：檢查員判的 major / critical 是真是假 ----
@@ -813,7 +878,8 @@ def cmd_review(args):
                     f"- 引文在全文：{'找得到' if quote_found(i['quote'], ft) else '**找不到**'}",
                     "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""]
     dest = PIPELINE / "results" / f"major_review_{'trial' if args.trial else args.batch}.md"
-    dest.write_text("\n".join(out))
+    import publish
+    dest.write_text(publish.keep_judgments(dest, "\n".join(out)))
     print(f"{n} 條 → {dest}")
 
 
@@ -855,6 +921,10 @@ def main():
             p.add_argument("--budget", type=float, help="這次執行的花費上限（人民幣）")
         if name in ("cards", "collect", "notes"):
             p.add_argument("--workers", type=int, default=5)
+        if name in ("cards", "collect"):
+            p.add_argument("--ignore-alarms", action="store_true", help="看過監控警報、處理過之後繼續跑")
+            p.add_argument("--no-canary", action="store_true", help="這次不自動埋雷")
+            p.add_argument("--no-audit", action="store_true", help="這次不自動抽樣審計")
         if name in ("cards", "submit", "notes"):
             p.add_argument("--limit", type=int, help="只處理前 N 篇")
             p.add_argument("--dry-run", action="store_true", help="只列出會做什麼，不送出")

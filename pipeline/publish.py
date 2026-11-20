@@ -54,6 +54,49 @@ def parse_review(path, source):
     return items
 
 
+JUDGE_RE = re.compile(r"^- 人工判定：.*$", re.M)
+
+
+def _block_key(block):
+    head = block.split("\n", 1)[0]
+    head = re.sub(r"^## \d+\. ", "", head)
+    pick = lambda pat: (re.search(pat, block) or [None, ""])[1] if re.search(pat, block) else ""
+    return (head, pick(r"嚴重度 / 類型：(.+)"), pick(r"欄位：(.+)"), pick(r"卡片寫：(.{0,80})"))
+
+
+def keep_judgments(dest, text):
+    """重新產生複核表時，把舊檔裡已經填好的「人工判定」搬到同一條目上（以標題、嚴重度、欄位、卡片原話認條目）。"""
+    if not dest.exists():
+        return text
+    old = {}
+    for b in re.split(r"\n(?=## \d+\. )", dest.read_text())[1:]:
+        m = JUDGE_RE.search(b)
+        if m and "＿＿（" not in m.group(0):
+            old[_block_key(b)] = m.group(0)
+    parts = re.split(r"\n(?=## \d+\. )", text)
+    kept = 0
+    for i, b in enumerate(parts[1:], 1):
+        line = old.get(_block_key(b))
+        if line:
+            parts[i] = JUDGE_RE.sub(lambda _: line, b, count=1)
+            kept += 1
+    if kept:
+        print(f"（保留舊檔已填的判定 {kept} 條）")
+    return "\n".join(parts)
+
+
+def sync_audit(batch):
+    """把審計結論寫進 manifest 的 audit 欄位。"""
+    with catalog_lock():
+        m = B.load()
+        for rid, v in m.items():
+            if v["batch"] == batch:
+                a = audit_summary(batch, rid)
+                if a:
+                    v["audit"] = a
+        B.save(m)
+
+
 def audit_summary(batch, rid):
     for d in ("_audit_max", "_audit"):
         p = B.ROOT / "eval" / batch / d / rid / "audit.json"

@@ -126,6 +126,31 @@ def sample(manifest, batch, n):
     return sorted(passed, key=lambda k: hashlib.sha1(f"audit:{k}".encode()).hexdigest())[:n]
 
 
+def stream_round(batch, pct, budget, effort="max"):
+    """量產用：通過的卡依 id 雜湊固定抽 pct%，還沒審過的審一次。回傳新審的卡裡和檢查員不一致的張數。"""
+    a = Auditor(batch, budget, effort)
+    passed = [k for k, v in a.r.manifest.items() if v["batch"] == batch and (v.get("card") or {}).get("state") == "passed"]
+    picks = [k for k in passed if int(hashlib.sha1(f"audit:{k}".encode()).hexdigest(), 16) % 100 < pct
+             and not (a.out / k / "audit.json").exists()]
+    print(f"審計：通過的卡 {len(passed)} 張，這次審 {len(picks)} 張（抽 {pct}%）", flush=True)
+    flagged = 0
+    for rid in picks:
+        try:
+            card = json.loads((B.ROOT / "cards" / batch / f"{rid}.json").read_text())
+            out = a.audit(rid, "audit", card, a.r.fulltext(rid))
+        except R.Stop as e:
+            print(f"審計停下：{e}")
+            break
+        res = (out or {}).get("result")
+        bad = bool(res and res["verdict"] != "pass" and serious(res))
+        flagged += bad
+        print(f"  {'不一致' if bad else '一致  '}  {rid}  {(res or {}).get('verdict', '失敗')}", flush=True)
+    if picks:
+        import publish
+        publish.sync_audit(batch)
+    return flagged
+
+
 def cmd_sample(args):
     a = Auditor(args.batch, args.budget, args.effort)
     picks = sample(a.r.manifest, args.batch, args.n)
@@ -180,7 +205,8 @@ def cmd_review(args):
                                        or "同欄位沒有提過"),
                     "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""]
     dest = PIPELINE / "results" / f"audit_review_{args.batch}.md"
-    dest.write_text("\n".join(out))
+    import publish
+    dest.write_text(publish.keep_judgments(dest, "\n".join(out)))
     print(f"{n} 條 → {dest}")
 
 
