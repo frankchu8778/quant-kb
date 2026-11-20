@@ -2,7 +2,6 @@
 import html
 import re
 
-from rapidfuzz import fuzz
 
 from common import LEVELS, REPORT_TYPES
 
@@ -48,13 +47,14 @@ def _norm(s):
     return re.sub(r"[\s　，,。．.：:；;、（）()\[\]【】\"'“”‘’%％\-—_*$\\{}|｜]", "", s)
 
 
-def quote_found(quote, fulltext_norm, threshold=90):
+def quote_found(quote, fulltext_norm):
+    """引文正規化後要逐字出現在全文裡。
+
+    以前比不到時會退回模糊比對（partial_ratio ≥ 90），結果引文改掉一個數字或刪掉「不」字都還判在原文
+    （TODO 第 26 項）。既有 659 條引文有 658 條逐字比得到，所以只比逐字。
+    """
     q = _norm(quote)
-    if not q:
-        return False
-    if q in fulltext_norm:
-        return True
-    return fuzz.partial_ratio(q, fulltext_norm) >= threshold
+    return bool(q) and q in fulltext_norm
 
 
 NUM_RE = re.compile(r"-?\d+(?:\.\d+)?")
@@ -87,13 +87,38 @@ def grounding_report(card, fulltext):
             "numbers_missing": missing_nums}
 
 
+# 完整的數字：千分位寫法（1,234.5）或一般寫法；前後不能再接數字或小數點，27.9 才不會被 27.91 包含
+NUM_TOKEN_RE = re.compile(r"(?<![\d.])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?!\d)|(?<![\d.])\d+(?:\.\d+)?")
+
+
+def _dec(t):
+    """13.00 → 13、27.90 → 27.9；整數不動（400 還是 400）。"""
+    return t.rstrip("0").rstrip(".") if "." in t else t
+
+
+def _num_tokens(s):
+    """切出字串裡的完整數字。逗號可能是千分位也可能是列舉（1,2,3），兩種讀法都收。"""
+    s = s or ""
+    out = set()
+    for t in NUM_TOKEN_RE.findall(s) + re.findall(r"\d+(?:\.\d+)?", s):
+        t = t.replace(",", "")
+        out.update({t, _dec(t)})
+    return out
+
+
 def value_numbers_not_in_quote(card):
-    """key_results.value 的每個數字都要出現在同一列的 quote 裡；回傳不符合的列。"""
+    """key_results.value 的每個數字（兩位數以上）都要是同一列 quote 裡的一個完整數字；回傳不符合的列。
+
+    以前用字串包含，27.9 在 27.91 裡也算通過（TODO 第 27 項）。
+    """
     bad = []
     for i, r in enumerate(card.get("key_results") or []):
-        q = r.get("quote") or ""
-        miss = [n for n in NUM_RE.findall(r.get("value") or "")
-                if len(n.replace("-", "").replace(".", "")) >= 2 and n.lstrip("-") not in q]
+        qt = _num_tokens(r.get("quote"))
+        miss = []
+        for n in NUM_TOKEN_RE.findall(r.get("value") or ""):
+            t = n.replace(",", "")
+            if len(t.replace(".", "")) >= 2 and t not in qt and _dec(t) not in qt:
+                miss.append(n)
         if miss:
             bad.append({"row": i, "metric": r.get("metric"), "value": r.get("value"), "missing": miss})
     return bad
@@ -117,7 +142,7 @@ def gate_v4(card, fulltext, schema):
         if "..." in q or "……" in q or "…" in q:
             problems.append(f"{path}.quote 用省略號拼接：{q[:60]}")
         elif not quote_found(q, ft_norm):
-            problems.append(f"{path}.quote 在全文找不到：{q[:60]}")
+            problems.append(f"{path}.quote 在全文找不到（要逐字照抄原文）：{q[:60]}")
     for b in value_numbers_not_in_quote(card):
         problems.append(f"key_results.{b['row']}.value 的數字 {b['missing']} 不在同列引文裡（{b['value'][:40]}）")
     return problems
