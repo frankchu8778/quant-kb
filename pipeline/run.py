@@ -626,7 +626,7 @@ def cmd_status(args):
         e["status"], e["request_counts"] = info.get("status"), info.get("request_counts")
         age = (time.time() - e["created_ts"]) / 60
         if batch_failed(info):
-            print(f"!! {e['id']}（{len(e['rids'])} 篇）被 Kimi 拒絕：{mark_batch_failed(r, e, info)}；篇已放回待送")
+            print(f"!! {e['id']}（{len(e['rids'])} 篇）整批沒跑（被拒或取消）：{mark_batch_failed(r, e, info)}；篇已放回待送")
         else:
             print(f"  {e['id']}（{len(e['rids'])} 篇）：{e['status']} {e.get('request_counts')}，已等 {age:.0f} 分鐘"
                   + ("，可以 collect 了" if e["status"] not in KB.OPEN_STATUS else ""))
@@ -647,7 +647,7 @@ def cmd_collect(args):
             if info.get("status") in KB.OPEN_STATUS:
                 continue
             if batch_failed(info):
-                print(f"!! {e['id']}（{len(e['rids'])} 篇）被 Kimi 拒絕：{mark_batch_failed(r, e, info)}；"
+                print(f"!! {e['id']}（{len(e['rids'])} 篇）整批沒跑（被拒或取消）：{mark_batch_failed(r, e, info)}；"
                       f"篇已放回待送，處理後重跑 submit", flush=True)
                 continue
             n_ok, cost = collect_one(r, e, info)
