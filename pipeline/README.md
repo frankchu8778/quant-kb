@@ -23,9 +23,11 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 | — 結果統計 | `run.py report <batch>` | 否 | 可用 |
 | — 人工複核表 | `run.py review <batch>` | 否 | 可用 |
 | — 分流規則對照 | `run.py triage <batch>` | 否 | 可用 |
-| 9 發布 | `render_cards.py` | 否 | 還是舊卡片格式，未更新 |
+| 8 抽樣審計 | `audit.py calibrate`、`audit.py sample <batch> --n 20`、`audit.py review <batch>` | **是**（MiniMax，約 ¥0.14／張） | 可用 |
+| — 人工判定寫回 | `publish.py reviews <batch>` | 否 | 可用 |
+| 9 發布 | `publish.py publish <batch>` | 否 | 可用：輸出到 `../kb/` |
 
-分流（階段 3）、升級（7）、抽樣審計（8）見 `../PLAN.md`，還沒有腳本。整體關係圖：`../docs/pipeline_overview.png`。待辦：`../TODO.md`。
+分流（階段 3）、升級（7）見 `../PLAN.md`，還沒有腳本。整體關係圖：`../docs/pipeline_overview.png`。待辦：`../TODO.md`。
 
 ## 不花錢的部分：照順序跑
 
@@ -260,6 +262,35 @@ python run.py review batch1
 
 把檢查員判的 critical / major 列成一張表（`results/major_review_<batch>.md`），每條附卡片原話、檢查員的說法、它引的原文，以及那段原文在全文裡找不找得到。逐條填「真 / 誤報 / 吹毛求疵」，就能算出檢查員的誤報率。
 
+### 抽樣審計：檢查員漏掉了什麼
+
+```bash
+python audit.py calibrate               # 先用已知答案的卡測審計員（7 個埋雷 + 3 個人工確認的真漏寫）
+python audit.py sample batch1 --n 20    # 抽通過的卡，交給 MiniMax 再審一次
+python audit.py review batch1           # 審計員判 critical / major 的條目 → results/audit_review_batch1.md
+```
+
+審計員是 MiniMax M3.1 Flash，和寫卡（Kimi）、檢查（DeepSeek）都不同廠，不用 Claude。推理強度固定 `max`：`high` 時它看得到漏寫但都判 minor（3 個真漏寫 0/3），`max` 是 2/3。審計員偏嚴，batch1 判 major 的 4 條只有 1 條是真的，所以一定要人工看複核表。MiniMax 沒有查餘額的介面，只靠 `--budget` 控制花費。
+
+## 發布
+
+```bash
+python publish.py reviews batch1     # 讀填好的 major_review_batch1.md、audit_review_batch1.md，判定寫回 manifest
+python publish.py publish batch1     # 通過的卡 → ../kb/cards/*.md，全文複製到 ../kb/fulltext/，重建 catalog.jsonl 與 CLAUDE.md
+```
+
+人工判定怎麼影響發布（只看「真」；誤報、吹毛求疵只記錄）：
+
+| 判定為真的問題 | 處理 |
+|---|---|
+| 第一次檢查抓到、卡片之後重寫過 | 已由重寫處理，不算 |
+| critical，仍在卡上 | 不發布 |
+| major / minor，仍在卡上 | 發布；卡片最後加「已知问题」，frontmatter `known_issues` 記條數 |
+
+判定詞（真／誤報／吹毛求疵）要寫在最前面，後面可以接說明；開頭認不出的會列成「看不懂」，不會猜。改判或修了卡之後，重跑這兩個指令即可。判定存在 manifest 每篇的 `review` 欄位，審計結論在 `audit` 欄位，發布紀錄在 `published` 欄位；這三個都不在 `card` 裡，`run.py` 存檔時不會蓋掉。
+
+知識庫的使用說明是 `kb_CLAUDE.md`，發布時複製成 `../kb/CLAUDE.md`。`kb/` 是產出物，不進 git。
+
 ## 已知的坑
 
 - **POC 與試產的卡片用的是 basic 等級的全文**（`fulltext/poc/clean-v2` 是從 `basic` 清出來的），不是 standard。新批次預設用 standard，行內公式的寫法會不同（`$R^{2}$` 對 `$R ^ { 2 }$`）。第一批跑完要確認程式檢查的引文比對通過率沒有掉。
@@ -269,13 +300,16 @@ python run.py review batch1
 - DeepSeek 偶爾回傳壞掉的 JSON，`trial.py` 會重試 3 次。
 - Kimi 每篇約 6 分鐘，5 並行跑 200 篇約 4 小時。
 - `trial_canary.py`（試產用）的邏輯類埋雷用 Opus 產生，會用到 Claude 訂閱額度；量產的 `run.py canary` 已改用 Kimi。
-- API 金鑰在 `../.env`（不進 git）：`DEEPSEEK_API_KEY`、`KIMI_API_KEY`。
+- API 金鑰在 `../.env`（不進 git）：`DEEPSEEK_API_KEY`、`KIMI_API_KEY`、`MINIMAX_API_KEY`。
 
 ## 檔案對照
 
 | 檔案 | 用途 |
 |---|---|
 | `batch.py` | 本機階段：入庫、轉檔、重複性檢查、品質閘、去固定頁、狀態、放行 |
+| `audit.py` | 抽樣審計：校準審計員、抽樣、複核表 |
+| `publish.py`、`kb_CLAUDE.md` | 人工判定寫回 manifest、發布到 `../kb/`；知識庫的使用說明 |
+| `render_cards.py` | 舊格式（v3）的渲染，只給 POC 的檢索評估 `eval_retrieval.py` 用 |
 | `run.py` | 模型階段：batch 送出與收回、檢查、退回重寫、餘額檢查、埋雷、結果統計、人工複核表 |
 | `kimi_batch.py` | Kimi 的 OpenAI 格式介面：batch 任務、即時呼叫、餘額查詢 |
 | `offpeak.py`、`cn_holidays.txt` | DeepSeek 尖峰時段的閘門（先詢問）與中國法定節假日清單 |
