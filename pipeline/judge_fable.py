@@ -115,10 +115,11 @@ def run_fable(prompt, schema, effort, wait, max_waits, model="claude-fable-5-2",
 # DeepSeek 離峰價（USD / 百萬 token；第三方整理，2026-09～10，未經官方確認）；尖峰為 2 倍
 DEEPSEEK_PRICE = {"deepseek-flash": (0.15, 0.60), "deepseek-v4-pro": (0.66, 1.98)}
 # Kimi 原價 13 / 68 人民幣（使用者提供），以 7.1 換算成 USD；batch 六折未計入
-DEEPSEEK_PRICE.update({"kimi-k3.1-pro": (1.83, 9.58)})
+DEEPSEEK_PRICE.update({"kimi-k3.1-pro": (1.83, 9.58), "MiniMax-M3.1-Flash": (0.15, 0.60)})
 # Anthropic 相容端點：模型名稱前綴 → (base_url, .env 裡的金鑰名稱)
 COMPAT_ENDPOINTS = {"deepseek": ("https://api.deepseek.com/anthropic", "DEEPSEEK_API_KEY"),
-                    "kimi": ("https://api.moonshot.cn/anthropic", "KIMI_API_KEY")}
+                    "kimi": ("https://api.moonshot.cn/anthropic", "KIMI_API_KEY"),
+                    "MiniMax": ("https://api.minimaxi.com/anthropic", "MINIMAX_API_KEY")}
 SUBMIT_HINT = "\n\n---\n完成后，调用 `submit` 工具提交结果（参数必须符合工具的 schema），不要在正文输出结果。"
 
 

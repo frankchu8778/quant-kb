@@ -58,7 +58,7 @@ from common import PIPELINE
 from validate import gate_v4
 
 WRITER, CHECKER = "kimi-k3.1-pro", "deepseek-flash"
-PRICE_CNY = {"kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
+PRICE_CNY = {"kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8), "MiniMax": (1.1, 4.3)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
 RETRY_WAITS = [10, 30, 90]
 BILLING_HINTS = ("402", "insufficient balance", "billing")
 SAFETY = 1.3              # 餘額要有估計花費的幾倍才送
@@ -303,12 +303,14 @@ class Runner:
 
 
 FAST_RETRY = False  # 測試時設成 True，重試不等待
+EFFORT = {}  # 模型名稱前綴 → 推理強度；沒列的用 high（audit.py 會設 MiniMax）
 
 
 def call_model(model, prompt, schema):
     """實際送 API 的唯一入口（測試時替換這個函式）。回傳 (structured output 或 None, meta)。"""
     try:
-        res, tail, secs = jf.run_deepseek(prompt, schema, "high", model)  # Kimi 與 DeepSeek 都走 Anthropic 相容端點
+        effort = next((v for k, v in EFFORT.items() if model.startswith(k)), "high")
+        res, tail, secs = jf.run_deepseek(prompt, schema, effort, model)  # Kimi、DeepSeek、MiniMax 都走 Anthropic 相容端點
     except offpeak.PeakHours:
         raise OffPeakWait()   # 跑到一半進入尖峰：不算失敗、不重試，這篇等離峰
     except Exception as e:
