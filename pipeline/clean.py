@@ -20,7 +20,7 @@ from common import KB
 BOILERPLATE_HEADINGS = re.compile(
     r"(免责声明|免責聲明|重要声明|法律声明|特别声明|一般声明|分析师声明|分析师承诺|研究团队简介|"
     r"分析师简介|作者简介|评级说明|投资评级|行业评级|公司评级|信息披露|联系我们|联系方式|"
-    r"本公司具备证券投资咨询)")
+    r"本公司具备证券投资咨询|研究小组|disclaimer|important\s*disclosures?|analyst\s*certification)", re.I)
 TOC_HEADINGS = re.compile(r"(目录|插图目录|表格目录|图表目录)\s*$")
 TOC_LINE = re.compile(r"(\d+\s*$|^[-*]?\s*(图|表|图表)\s*\d+)")
 PAGE_NOTICE = re.compile(r"^(请阅读|請閱讀|谨请参阅|請參閱|请务必阅读|敬请参阅).{0,40}(声明|聲明|说明|條款|条款|部分)")
@@ -43,7 +43,7 @@ def strip_sections(lines):
                 in_toc = True
                 removed.append(line)
                 continue
-            if skip_level is None and BOILERPLATE_HEADINGS.search(title):
+            if skip_level is None and BOILERPLATE_HEADINGS.search(re.sub(r"\s+", "", title)):   # 「重 要 声 明」這種字間空格
                 skip_level = level
         elif in_toc:
             if not line.strip() or TOC_LINE.search(line.strip()):
