@@ -3,7 +3,8 @@
 # （程式檢查、DeepSeek 檢查〔尖峰時段會等到離峰〕、重寫、埋雷、審計），有新收回的就重新發布。
 # 這個批次的 batch 全部收回（完成或被拒結案）才結束。
 #
-# 用法：bash watch.sh <batch> <每次 collect 的預算> [POLL 秒數，預設 600]
+# 用法：bash watch.sh <batch> <每次 collect 的預算> [POLL 秒數，預設 600] [其他給 collect 的參數…]
+#   例：bash watch.sh batch1 25 600 --ignore-alarms   # 看過監控警報、決定繼續時
 # 中途被關掉也沒關係：重跑同一個指令即可，已收回、已檢查過的不會重複花錢。
 set -u
 cd "$(dirname "$0")"
@@ -11,6 +12,8 @@ P=/home/newt/venvs/kb-parse/bin/python
 BATCH=$1
 BUDGET=$2
 POLL=${3:-600}
+shift $(( $# < 3 ? $# : 3 ))
+EXTRA=("$@")
 
 open_count() {
   $P -c "import json; print(sum(1 for e in json.load(open('../catalog/kimi_batches.json')) if e['batch'] == '$BATCH' and not e['collected']))"
@@ -19,7 +22,7 @@ open_count() {
 while :; do
   echo "== $(date '+%F %T') 查 $BATCH 的 batch =="
   before=$(open_count)
-  $P -u run.py collect "$BATCH" --budget "$BUDGET" --wait-offpeak
+  $P -u run.py collect "$BATCH" --budget "$BUDGET" --wait-offpeak "${EXTRA[@]}"
   after=$(open_count)
   if [ "$after" != "$before" ]; then
     $P publish.py reviews "$BATCH" && $P publish.py publish "$BATCH"
