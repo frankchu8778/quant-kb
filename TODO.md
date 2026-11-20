@@ -37,7 +37,7 @@
 | 16 | 發布（階段 9） | `render_cards.py` 還是舊卡片格式；`catalog.jsonl`、知識庫的 `CLAUDE.md` 都要跟著新 schema 改 | |
 | 17 | 檢索 | 寫檢索用的 Skill；卡片多了之後重跑檢索測試，決定要不要加語意搜尋 | |
 | 18 | Kimi batch | 目前走即時 API。接上 batch 才拿得到六折，但流程是非同步的，要另寫 | 程式完成（`run.py submit / collect`）。**Kimi 端沒有產出**：4 個 batch（含只問 1+1 的測試）都停在 in_progress、完成 0，待 Kimi 客服；在那之前走即時 |
-| 19 | DeepSeek 離峰排程 | 尖峰時段不呼叫（使用者 2026-11-17 規定） | 完成：`offpeak.py` 閘門、`--wait-offpeak` 自動等離峰；記帳仍以尖峰價計 |
+| 19 | DeepSeek 離峰排程 | 尖峰時段先詢問（使用者 2026-11-17 定為不呼叫，2026-11-20 改成先詢問） | 完成：`offpeak.py` 閘門（終端機互動時問 y/N，背景執行擋下、要 `--allow-peak`）、`--wait-offpeak` 自動等離峰；記帳仍以尖峰價計 |
 | 20 | 詞彙表維護 | 彙整卡片的 `new_tag_suggestions`，人工決定哪些加進詞彙表 | |
 | 21 | 增量處理 | 新研報進 `inbox/` 後定期自動跑本機階段 | |
 | 22 | 不複製 PDF | 現在 `batch.py sample` 會把 PDF 複製到 `inbox/<batch>/`（batch1 佔 324MB）。改成只在 manifest 記原始路徑，轉檔時直接讀原位置，本機只留全文與卡片。**跑大量之前要改**。順便檢討：MinerU 原始輸出（257MB）與抽出的圖片（約 200MB）比 PDF 還大，卡片用不到圖片，可以不留 | 使用者 2026-11-17 提出，暫緩 |
