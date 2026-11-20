@@ -1,7 +1,7 @@
 """量產的本機階段（不呼叫任何模型 API）：入庫 → 轉檔 → 品質閘 → 去固定頁 → 狀態與花費估算。
 
 用法（<batch> 是 inbox/ 下的資料夾名稱，例如 batch1）：
-  python batch.py sample  <batch> --n 100         # 從 .env 的 Research_Report_PATH 隨機選 PDF 複製到 inbox/<batch>/
+  python batch.py sample  <batch> --n 100 [--no-copy]  # 從 .env 的 Research_Report_PATH 隨機選 PDF 複製到 inbox/<batch>/；--no-copy 只記路徑
   python batch.py ingest  <batch>                 # 階段 0：掃描 PDF、去重、寫進 manifest
   python batch.py convert <batch> [--tier standard] [--postprocess-only]   # 階段 1：MinerU（本機 GPU）
   python batch.py dedup   <batch>                 # 階段 1a：全文相似度比對，疑似重複的標成 hold
@@ -137,6 +137,16 @@ def nearest(sig, fp, kind, exclude):
     return best
 
 
+def pdf_path(v, batch):
+    """這篇的 PDF 在哪：用 --no-copy 選的記原始路徑（不搬檔），舊批次在 inbox/<batch>/。"""
+    return Path(v["source_path"]) if v.get("source_path") else ROOT / "inbox" / batch / v["source_pdf"]
+
+
+def selections():
+    """所有批次的選檔紀錄 {batch: _selection.json 內容}。"""
+    return {p.parent.name: json.loads(p.read_text()) for p in (ROOT / "inbox").glob("*/_selection.json")}
+
+
 def hold(v, reason):
     """擋下一篇並記住它原本在哪個階段，release 時回得去。"""
     v.update(hold_from=v["status"], status="hold", hold_reason=reason)
@@ -148,6 +158,12 @@ def sync_holds(m, batch):
     rows = []
     for rid, v in of_batch(m, batch).items():
         src, parked = inbox / v["source_pdf"], hdir / v["source_pdf"]
+        if v.get("source_path"):   # 沒搬檔的篇：原始 PDF 留在原位，只列清單
+            if v["status"] == "hold":
+                hdir.mkdir(parents=True, exist_ok=True)
+                md = ROOT / "fulltext" / batch / v.get("tier", "standard") / f"{rid}.md"
+                rows.append((rid, v, md if md.exists() else None))
+            continue
         if v["status"] == "hold":
             hdir.mkdir(parents=True, exist_ok=True)
             if src.exists() and not parked.exists():
@@ -163,7 +179,10 @@ def sync_holds(m, batch):
              "- 要放行：`python batch.py release " + batch + " <id>`（PDF 會移回 inbox，接著往下處理）",
              "- 不處理：留著不動即可，不會進到花錢的階段", ""]
     for rid, v, md in rows:
-        lines += [f"## {v['source_pdf']}", "", f"- id：`{rid}`", f"- 原因：{v['hold_reason']}",
+        lines += [f"## {v['source_pdf']}", "", f"- id：`{rid}`", f"- 原因：{v['hold_reason']}"]
+        if v.get("source_path"):
+            lines.append(f"- PDF（原位，沒有搬）：`{v['source_path']}`")
+        lines += [
                   f"- 在哪一步被擋：{v['hold_from']}；頁數 {v.get('pages')}；轉出的全文 {v.get('chars_raw', '（尚未轉檔）')} 字"]
         if md:
             lines.append(f"- 轉出的全文：`{md.relative_to(ROOT)}`")
@@ -234,6 +253,7 @@ def cmd_sample(args):
     sha = lambda p: hashlib.sha1(p.read_bytes()).hexdigest()
     known = {v["sha1"] for v in load().values()}
     known |= {sha(p) for p in (ROOT / "inbox").glob("*/*.pdf")}
+    known |= {x["sha1"] for b, sel in selections().items() if b != args.batch for x in sel["picked"]}  # 別的批次選過、還沒入庫的
     pool = sorted(p for p in src.rglob("*") if p.is_file() and p.suffix.lower() == ".pdf")
     random.Random(args.seed).shuffle(pool)
     dest = ROOT / "inbox" / args.batch
@@ -247,41 +267,50 @@ def cmd_sample(args):
             skipped += 1
             continue
         known.add(h)
-        name = p.name if not (dest / p.name).exists() else f"{p.stem}__{h[:6]}{p.suffix}"
-        shutil.copy2(p, dest / name)
+        name = p.name if not any(x["file"] == p.name for x in picked) and not (dest / p.name).exists() \
+            else f"{p.stem}__{h[:6]}{p.suffix}"
+        if not args.no_copy:
+            shutil.copy2(p, dest / name)
         picked.append({"file": name, "from": str(p.relative_to(src)), "sha1": h})
     (dest / "_selection.json").write_text(json.dumps(
-        {"source": str(src), "seed": args.seed, "pool": len(pool), "picked": picked}, ensure_ascii=False, indent=2))
-    print(f"來源 {src}：共 {len(pool)} 份 PDF；選了 {len(picked)} 份複製到 {dest}；略過已處理或完全相同的 {skipped} 份")
+        {"source": str(src), "seed": args.seed, "pool": len(pool), "no_copy": args.no_copy, "picked": picked},
+        ensure_ascii=False, indent=2))
+    print(f"來源 {src}：共 {len(pool)} 份 PDF；選了 {len(picked)} 份"
+          + ("（只記路徑，沒有複製）" if args.no_copy else f"複製到 {dest}") + f"；略過已處理或完全相同的 {skipped} 份")
 
 
 def cmd_ingest(args):
     m = load()
     by_hash = {v["sha1"]: k for k, v in m.items()}
     inbox = ROOT / "inbox" / args.batch
-    pdfs = sorted(inbox.glob("*.pdf"))
+    sel = selections().get(args.batch, {})
+    if sel.get("no_copy"):   # 沒搬檔：照選檔紀錄去原位置讀
+        pdfs = [(Path(sel["source"]) / x["from"], x["file"]) for x in sel["picked"]]
+    else:
+        pdfs = [(p, p.name) for p in sorted(inbox.glob("*.pdf"))]
     if not pdfs:
         raise SystemExit(f"{inbox} 沒有 PDF")
     new = dup = 0
     fp, held = load_fp(), []
-    for pdf in pdfs:
+    for pdf, fname in pdfs:
         sha = hashlib.sha1(pdf.read_bytes()).hexdigest()
         if sha in by_hash:
             # 內容相同的檔案只記一次；重複的來源檔名留在紀錄裡
             rec = m[by_hash[sha]]
-            label = f"{args.batch}/{pdf.name}"
+            label = f"{args.batch}/{fname}"
             if label != f"{rec['batch']}/{rec['source_pdf']}":
                 dup += 1
                 if label not in rec.get("duplicates", []):
                     rec.setdefault("duplicates", []).append(label)
             continue
-        mt = NAME_RE.match(pdf.name)
+        mt = NAME_RE.match(fname)
         date, broker = (mt.group(1), mt.group(2)) if mt else ("nodate", "unknown")
         rid, n = f"{date}_{broker}_{sha[:6]}", 6
         while rid in m:  # 雜湊前綴撞號時加長
             n += 2
             rid = f"{date}_{broker}_{sha[:n]}"
-        m[rid] = {"batch": args.batch, "source_pdf": pdf.name, "sha1": sha,
+        m[rid] = {"batch": args.batch, "source_pdf": fname, "sha1": sha,
+                  **({"source_path": str(pdf)} if sel.get("no_copy") else {}),
                   "bytes": pdf.stat().st_size, "pages": page_count(pdf),
                   "name_parsed": bool(mt), "status": "ingested",
                   "ingested_at": time.strftime("%Y-%m-%d %H:%M")}
@@ -342,7 +371,7 @@ def cmd_convert(args):
         stage = ROOT / "pipeline" / "_mineru_raw" / args.batch / f"_todo_{int(time.time())}"
         stage.mkdir(parents=True)
         for _, v in todo:
-            (stage / v["source_pdf"]).symlink_to(inbox / v["source_pdf"])
+            (stage / v["source_pdf"]).symlink_to(pdf_path(v, args.batch))
         env = dict(os.environ)
         if args.tier == "standard":  # standard 等級的 VLM 連本機 vLLM（serve_mineru_vlm.sh），不上傳資料
             import socket
@@ -381,7 +410,9 @@ def report_holds(m, held):
     sync_holds(m, batch)
     lines = [f"⚠️  有 {len(held)} 篇被擋下（hold），需要你確認："] + \
             [f"   {rid}  {m[rid]['source_pdf'][:50]}\n      → {m[rid]['hold_reason']}" for rid in held] + \
-            [f"   PDF 已移到 {ROOT / 'hold' / batch}，原因寫在裡面的「待處理清單.md」。",
+            [(f"   原始 PDF 留在原位（沒有搬）；清單與原因在 {ROOT / 'hold' / batch}/待處理清單.md。"
+              if all(m[r].get("source_path") for r in held) else
+              f"   PDF 已移到 {ROOT / 'hold' / batch}，原因寫在裡面的「待處理清單.md」。"),
              "   確認不是問題的，用 `python batch.py release <batch> <id>` 放行。"]
     print("\n".join(lines))
     print(f"HOLD {len(held)}", file=sys.stderr)
@@ -545,6 +576,7 @@ def main():
             p.add_argument("--n", type=int, default=100)
             p.add_argument("--seed", default="batch-sample-v1")
             p.add_argument("--src", help="來源資料夾；不給就用 .env 的 Research_Report_PATH")
+            p.add_argument("--no-copy", action="store_true", help="不複製 PDF，只記原始路徑（轉檔時直接讀原位置）")
         if name == "release":
             p.add_argument("ids", nargs="+")
         if name == "status":

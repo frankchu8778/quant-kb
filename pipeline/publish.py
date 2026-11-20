@@ -206,6 +206,24 @@ def render(rid, v, c, vocab, st):
     return "\n".join(out), fm
 
 
+def vocab_md(vocab, st, catalog):
+    """標籤對照表：把問題對到標籤 id 用。附每個標籤目前有幾張卡。"""
+    from collections import Counter
+    cnt = Counter()
+    for c in catalog:
+        for k in ("strategy_types", "families", "methods"):
+            cnt.update(x.split("/")[0] for x in c[k])
+    out = ["# 标签对照", "", "由 `publish.py` 产生。「卡片数」是目前知识库里标了这个标签的卡。", "",
+           "## 策略大类（strategy_types）", "", "| id | 中文 | 定义 | 卡片数 |", "|---|---|---|---|"]
+    out += [f"| {k} | {v['zh']} | {v.get('definition', '')} | {cnt[k]} |" for k, v in st.items()]
+    out += ["", "## 方法家族（families）", "", "| id | 中文 | 别名 | 卡片数 |", "|---|---|---|---|"]
+    out += [f"| {k} | {v['zh']} | {'、'.join(map(str, v.get('aliases', [])))} | {cnt[k]} |" for k, v in vocab["families"].items()]
+    out += ["", "## 方法（methods）", "", "| id | 中文 | 别名 | 家族 | 卡片数 |", "|---|---|---|---|---|"]
+    out += [f"| {k} | {v['zh']} | {'、'.join(map(str, v.get('aliases', [])))} | {v.get('family', '')} | {cnt[k]} |"
+            for k, v in vocab["methods"].items()]
+    return "\n".join(out) + "\n"
+
+
 def cmd_publish(args):
     vocab = load_vocab()
     st = yaml.safe_load((PIPELINE / "judge" / "strategy_types.yaml").read_text())["strategy_types"]
@@ -248,6 +266,7 @@ def cmd_publish(args):
                                            "primary_strategy_type", "strategy_types", "asset_class", "frequency",
                                            "families", "methods", "known_issues")})
     (KB_OUT / "catalog.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in catalog))
+    (KB_OUT / "VOCAB.md").write_text(vocab_md(vocab, st, catalog))
     shutil.copy(PIPELINE / "kb_CLAUDE.md", KB_OUT / "CLAUDE.md")
     print(f"{args.batch}：發布 {len(done)} 張（其中帶已知問題 "
           f"{sum(1 for r in done if (m[r].get('review') or {}).get('items') and any(i.get('open') for i in m[r]['review']['items']))} 張）"

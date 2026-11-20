@@ -70,6 +70,7 @@ PRICE_CNY = {"kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8), "M
 RETRY_WAITS = [10, 30, 90]
 BILLING_HINTS = ("402", "insufficient balance", "billing")
 SAFETY = 1.3              # 餘額要有估計花費的幾倍才送
+BATCH_ACTUAL_RATIO = 1.66  # batch 實際花費 / 送出時的估計（batch1：¥18.11/¥10.90、¥5.21/¥3.20）
 REWRITE_SHARE = 0.25      # 估計有多少比例的篇會需要即時重寫（試產約一到兩成，取保守值）
 RECHECK_SHARE = 0.20      # 估計有多少比例的篇會需要複檢
 REGISTRY = B.ROOT / "catalog" / "kimi_batches.json"
@@ -391,7 +392,7 @@ def pending(r, batch):
             and not (B.ROOT / "eval" / batch / rid / "kimi_write.json").exists()]
 
 
-def preflight(chars, write_via, label, kimi_extra=0.0, ds_extra=0.0):
+def preflight(chars, write_via, label, kimi_extra=0.0, ds_extra=0.0, write_chars=None):
     """送出前的餘額檢查。回傳 True 才可以送。
 
     需求量用這批每篇的實際字數算：
@@ -399,12 +400,18 @@ def preflight(chars, write_via, label, kimi_extra=0.0, ds_extra=0.0):
       DeepSeek = 筆記與檢查（尖峰價）＋ RECHECK_SHARE 的複檢
     任一邊餘額 < 需求 × SAFETY 就不通過；餘額查不到也不通過。
     """
-    first = B.estimate(chars, write_via, "deepseek")[0] if chars and write_via else 0.0
+    wc = chars if write_chars is None else write_chars   # 卡片已經寫好的篇不用估第一次寫卡
+    first = B.estimate(wc, write_via, "deepseek")[0] if wc and write_via else 0.0
     rewrite, check = B.estimate(chars, "kimi", "deepseek") if chars else (0.0, 0.0)
-    need = {"Kimi": first + REWRITE_SHARE * rewrite + kimi_extra,
+    # 已送出、還沒收回的 Kimi batch 可能還沒扣款：它們的花費也要留在餘額裡
+    flying = [e for e in load_reg() if not e["collected"]]
+    held = sum(e.get("est_cny", 0) for e in flying) * BATCH_ACTUAL_RATIO
+    need = {"Kimi": first + REWRITE_SHARE * rewrite + kimi_extra + held,
             "DeepSeek": check * (1 + RECHECK_SHARE) + ds_extra}
     ok = True
     print(f"餘額檢查（{label}）：")
+    if flying:
+        print(f"  （Kimi 需求含 {len(flying)} 個還沒收回的 batch 約 ¥{held:.2f}：送出時的估計 × {BATCH_ACTUAL_RATIO}）")
     for name, fn in [("Kimi", KB.balance), ("DeepSeek", KB.deepseek_balance)]:
         try:
             bal = fn()
@@ -678,7 +685,9 @@ def cmd_cards(args):
         return
     if args.budget is None:
         raise SystemExit("真的送出時必須給 --budget")
-    if not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇"):
+    unwritten = [r.manifest[rid]["chars_clean"] for rid in todo
+                 if not (B.ROOT / "cards" / args.batch / f"{rid}.json").exists()]
+    if not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇", write_chars=unwritten):
         raise SystemExit("餘額不足，沒有送出")
     run_with_offpeak(r, todo, args)
     followups(r, args)

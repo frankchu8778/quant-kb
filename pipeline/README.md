@@ -8,7 +8,8 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 
 | 階段 | 指令 | 花錢嗎 | 狀態 |
 |---|---|---|---|
-| — 選檔 | `batch.py sample <batch> --n 100` | 否 | 可用 |
+| — 選檔 | `batch.py sample <batch> --n 100 --no-copy` | 否 | 可用；`--no-copy` 只記原始路徑、不複製 PDF（建議） |
+| — 匯入已寫好的卡 | `adopt.py <batch> --cards … --fulltext …` | 否 | 試產的 20 張 Kimi 卡用這個登記成 `poc` 批次 |
 | 0 入庫 | `batch.py ingest <batch>` | 否 | 可用 |
 | 1 轉檔 | `batch.py convert <batch>` | 否（本機 GPU） | 可用 |
 | 1a 重複性檢查 | `batch.py dedup <batch>` | 否 | 可用 |
@@ -327,6 +328,8 @@ python publish.py publish batch1     # 通過的卡 → ../kb/cards/*.md，全�
 | `batch.py` | 本機階段：入庫、轉檔、重複性檢查、品質閘、去固定頁、狀態、放行 |
 | `audit.py` | 抽樣審計：校準審計員、抽樣、複核表 |
 | `monitor.py` | 監控指標與警戒線 |
+| `adopt.py` | 把已寫好的卡登記成正式批次，只跑後半段 |
+| `skill/quant-kb/` | 全域檢索 Skill 的原始檔；`~/.claude/skills/quant-kb` 是指向它的連結 |
 | `publish.py`、`kb_CLAUDE.md` | 人工判定寫回 manifest、發布到 `../kb/`；知識庫的使用說明 |
 | `render_cards.py` | 舊格式（v3）的渲染，只給 POC 的檢索評估 `eval_retrieval.py` 用 |
 | `run.py` | 模型階段：batch 送出與收回、檢查、退回重寫、餘額檢查、埋雷、結果統計、人工複核表 |
