@@ -479,8 +479,10 @@ def cmd_submit(args):
             print(f"  batch {i + 1}: {len(ch)} 篇，例如 {ch[0]}")
         print("（--dry-run：沒有上傳、沒有建立任何 batch）")
         return
-    if not ok:
-        raise SystemExit("餘額不足，沒有送出任何 batch")
+    if not ok and not args.dry_run:
+        if not args.ignore_balance:
+            raise SystemExit("餘額不足，沒有送出任何 batch（使用者明說可以先送、之後再儲值，才加 --ignore-balance）")
+        print("!! 餘額不足，但加了 --ignore-balance：照樣送出。收回前要儲值，否則 batch 可能失敗或收回後的檢查停下")
     if args.budget is None:
         raise SystemExit("真的送出時必須給 --budget")
     if est > args.budget:
@@ -942,6 +944,8 @@ def main():
         if name == "submit":
             p.add_argument("--chunk", type=int, default=20, help="每個 batch 最多幾篇")
             p.add_argument("--window", default="12h", help="completion_window，最短 12h")
+            p.add_argument("--ignore-balance", action="store_true",
+                           help="餘額預檢不過也送（只在使用者明說之後會儲值時才加）")
         if name == "collect":
             p.add_argument("--wait", action="store_true", help="等到所有 batch 完成")
             p.add_argument("--poll", type=int, default=120, help="每隔幾秒查一次")
