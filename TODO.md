@@ -60,4 +60,3 @@
 ## 需要人決定的事
 
 - 第 9 項由誰來看（Claude 或人工）。
-- `cards/trial/` 和 `eval/trial/` 要不要加進 `.gitignore`（目前是未追蹤狀態）。

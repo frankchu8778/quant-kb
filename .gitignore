@@ -8,16 +8,21 @@ inbox/**/*.pdf
 __pycache__/
 pipeline/logs/*.log
 pipeline/_mineru_raw/
-pipeline/_mineru_test/
+lab/pipeline/_mineru_test/
 # 數據（卡片、檢查結果、批次全文、manifest 與指紋）不進 git；POC 階段已提交的保留
-cards/trial/
-eval/trial/
+lab/cards/trial/
+lab/eval/trial/
 cards/batch*/
 eval/batch*/
 fulltext/batch*/
-fulltext/poc/clean-v2-standard/
+lab/fulltext/poc/clean-v2-standard/
 catalog/
 inbox/*/_selection.json
 hold/
 # 發布出去的知識庫（由 publish.py 產生）
-kb/
+/kb/
+cards/poc/
+eval/poc/
+lab/eval/_notes_ab/
+lab/eval/_stability/
+lab/eval/_kimi_batch_probe/

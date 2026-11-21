@@ -7,9 +7,9 @@
   python trial.py check --checker deepseek-flash [--writers opus deepseek] [--variant clean|canary]
 
 輸出：
-  cards/trial/<writer>/<id>.json、.meta.json（含程式檢查結果與重寫紀錄）
-  eval/trial/check-<checker>/<id>/notes.json（檢查員獨立讀全文的筆記，每篇一份）
-  eval/trial/check-<checker>/<id>/<writer>.<variant>.json（檢查結果）
+  lab/cards/trial/<writer>/<id>.json、.meta.json（含程式檢查結果與重寫紀錄）
+  lab/eval/trial/check-<checker>/<id>/notes.json（檢查員獨立讀全文的筆記，每篇一份）
+  lab/eval/trial/check-<checker>/<id>/<writer>.<variant>.json（檢查結果）
 已存在的結果會跳過，中斷後重跑即可續跑。
 """
 import argparse
@@ -23,12 +23,13 @@ import yaml
 
 import judge_fable as jf
 import offpeak
-from common import KB, PIPELINE, load_vocab, vocab_blocks
+from common import KB, LAB, PIPELINE, load_vocab, vocab_blocks
 from validate import gate_v4
 
-SRC = KB / "fulltext" / "poc" / "clean-v2"
-CARDS = KB / "cards" / "trial"
-EVAL = KB / "eval" / "trial"
+# 試產資料已封存到 lab/；量產只用這個模組的 ctx()、check_schema()、items()
+SRC = LAB / "fulltext" / "poc" / "clean-v2"
+CARDS = LAB / "cards" / "trial"
+EVAL = LAB / "eval" / "trial"
 WRITERS = {"opus": "claude-opus-5-5", "deepseek": "deepseek-flash", "kimi": "kimi-k3.1-pro"}
 CHECK_TYPES = ["方法对象错误", "数字张冠李戴", "引用不支持", "标签错误", "重要遗漏", "其他"]
 s, arr, obj, enum = jf.s, jf.arr, jf.obj, jf.enum
@@ -208,8 +209,8 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     w = sub.add_parser("write")
     w.add_argument("--writer", choices=list(WRITERS), required=True)
-    w.add_argument("--src", help="全文資料夾（相對 KB）；預設 fulltext/poc/clean-v2")
-    w.add_argument("--out-name", help="輸出到 cards/trial/<out-name>/；預設同 writer")
+    w.add_argument("--src", help="全文資料夾（相對 KB）；預設 lab/fulltext/poc/clean-v2")
+    w.add_argument("--out-name", help="輸出到 lab/cards/trial/<out-name>/；預設同 writer")
     g = sub.add_parser("gate")
     g.add_argument("--verbose", action="store_true")
     k = sub.add_parser("check")

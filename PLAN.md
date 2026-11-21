@@ -1,6 +1,6 @@
 # 量化研報知識庫：量產 pipeline 規劃
 
-> 2026-11-16 訂。POC 之前的部署計畫移到 `PLAN_POC.md`，POC 結果見 `POC_REPORT.md`。
+> 2026-11-16 訂。POC 之前的部署計畫移到 `lab/docs/PLAN_POC.md`，POC 結果見 `lab/docs/POC_REPORT.md`（試產與實驗都封存在 `lab/`）。整體流程的定案紀錄見 `docs/PIPELINE.md`。
 > 本檔的成本數字有實測也有假設，假設的地方都有標明，試產後要換成實際數字。
 
 ## 原則
@@ -146,7 +146,7 @@
 ## 試產結果（2026-11-16，20 篇）
 
 腳本：`pipeline/trial.py`（寫卡、程式檢查、單卡檢查）、`pipeline/trial_canary.py`（埋雷）。
-產出：`cards/trial/`、`eval/trial/check-deepseek-flash/`。
+產出：`cards/trial/`、`eval/trial/check-deepseek-flash/`（現已移到 `lab/`）。
 
 **寫卡**
 

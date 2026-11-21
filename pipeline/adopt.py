@@ -1,7 +1,7 @@
 """把已經寫好的卡（例如試產時 Kimi 寫的）登記成正式批次，只跑後半段：筆記、檢查、需要時重寫、審計、發布。
 
 用法：
-  python adopt.py poc --cards cards/trial/kimi --fulltext fulltext/poc/clean-v2 --pdfs inbox/poc
+  python adopt.py poc --cards lab/cards/trial/kimi --fulltext lab/fulltext/poc/clean-v2 --pdfs inbox/poc
 接著：
   python run.py cards poc --budget N --wait-offpeak   # 卡片已存在，不會重寫第一次；從檢查員筆記開始
   python publish.py reviews poc && python publish.py publish poc

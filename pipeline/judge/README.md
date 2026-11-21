@@ -15,15 +15,15 @@
 ```
 
 - 執行：`claude -p --model claude-fable-5-2 --tools "" --system-prompt "" --json-schema <schema> --output-format json`，effort 先用 high。
-- 全文用 `fulltext/poc/clean-v2/`（三種卡片產生時用的都是這份）。不放 PDF。
-- 輸出存到 `eval/fable/`，每篇的 prompt、原始回覆、用量都保留。
+- 全文用 `lab/fulltext/poc/clean-v2/`（三種卡片產生時用的都是這份）。不放 PDF。
+- 輸出存到 `lab/eval/fable/`，每篇的 prompt、原始回覆、用量都保留。
 
 ## 送進第 2 次呼叫前，卡片的處理
 
 - 三種卡片：`sonnet-v2`、`minimax-v2`、`qwen-v2-think`
 - 移除評分類欄位：`value_level`、`value_reason`、`reproducibility`、`reproducibility_reason`
 - 統一欄位順序、統一 JSON 縮排；移除 meta 與 raw 輸出
-- A/B/C 對應哪個模型：每篇用固定種子隨機打亂，對照表另存在 `eval/fable/_mapping.json`，不送進 prompt
+- A/B/C 對應哪個模型：每篇用固定種子隨機打亂，對照表另存在 `lab/eval/fable/_mapping.json`，不送進 prompt
 
 ## 埋雷（一次）
 
@@ -35,7 +35,7 @@
 | 2 | 方法標籤 | 把一個主要方法換成詞彙表裡無關的方法 |
 | 3 | 核心觀點 | 把 `core_idea` 的結論方向改反 |
 
-改動內容記在 `eval/fable/_canaries.json`，最後統計 Fable 抓到幾個。
+改動內容記在 `lab/eval/fable/_canaries.json`，最後統計 Fable 抓到幾個。
 
 ## 輸出 schema 重點
 

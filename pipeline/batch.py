@@ -1,7 +1,7 @@
 """量產的本機階段（不呼叫任何模型 API）：入庫 → 轉檔 → 品質閘 → 去固定頁 → 狀態與花費估算。
 
 用法（<batch> 是 inbox/ 下的資料夾名稱，例如 batch1）：
-  python batch.py sample  <batch> --n 100 [--no-copy]  # 從 .env 的 Research_Report_PATH 隨機選 PDF 複製到 inbox/<batch>/；--no-copy 只記路徑
+  python batch.py sample  <batch> --n 100 [--copy]     # 從 .env 的 Research_Report_PATH 隨機選 PDF，只記原始路徑（不複製）；--copy 才複製到 inbox/<batch>/
   python batch.py ingest  <batch>                 # 階段 0：掃描 PDF、去重、寫進 manifest
   python batch.py convert <batch> [--tier standard] [--postprocess-only]   # 階段 1：MinerU（本機 GPU）
   python batch.py dedup   <batch>                 # 階段 1a：全文相似度比對，疑似重複的標成 hold
@@ -49,7 +49,7 @@ CJK = re.compile(r"[一-鿿]")
 NAME_RE = re.compile(r"(\d{8})-([^-]+)-(.*)")
 
 # 品質閘門檻。超過的篇標成 hold，不進寫卡；門檻偏寬，寧可放行後由檢查員處理。
-MAX_GARBLED_PCT = 0.5        # PLAN_POC.md 的 V1 標準
+MAX_GARBLED_PCT = 0.5        # lab/docs/PLAN_POC.md 的 V1 標準
 MIN_CHARS = 2000             # 全文太短：轉檔失敗或只有封面
 MIN_CHARS_PER_PAGE = 150     # 每頁字數太少：多半是掃描版且 OCR 沒出字
 MIN_CJK_OR_LATIN_PCT = 30    # 中文加英文字母佔比太低：多半是表格或亂碼
@@ -244,7 +244,7 @@ def source_dir(args):
 
 
 def cmd_sample(args):
-    """隨機選 PDF 複製進 inbox/<batch>/。已在 manifest 或其他 inbox 批次裡的（依檔案雜湊）不會被選到。"""
+    """隨機選 PDF，記在 inbox/<batch>/_selection.json（預設不複製檔案）。已在 manifest 或其他 inbox 批次裡的（依檔案雜湊）不會被選到。"""
     import random
     import shutil
     src = source_dir(args)
@@ -576,7 +576,10 @@ def main():
             p.add_argument("--n", type=int, default=100)
             p.add_argument("--seed", default="batch-sample-v1")
             p.add_argument("--src", help="來源資料夾；不給就用 .env 的 Research_Report_PATH")
-            p.add_argument("--no-copy", action="store_true", help="不複製 PDF，只記原始路徑（轉檔時直接讀原位置）")
+            # 預設不複製 PDF：只記原始路徑，轉檔時直接讀原位置；--copy 才複製進 inbox/<batch>/（舊做法）
+            p.add_argument("--copy", dest="no_copy", action="store_false", help="把 PDF 複製進 inbox/<batch>/")
+            p.add_argument("--no-copy", dest="no_copy", action="store_true", help=argparse.SUPPRESS)
+            p.set_defaults(no_copy=True)
         if name == "release":
             p.add_argument("ids", nargs="+")
         if name == "status":

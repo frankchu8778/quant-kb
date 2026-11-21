@@ -7,7 +7,7 @@
 每篇兩次 headless 呼叫（無工具、空 system prompt、structured output）：
   pass1：只看全文 → Fable 參考卡片 + 必須涵蓋的要點 + 分類回饋
   pass2：全文 + pass1 筆記 + 匿名卡片 A/B/C → 問題清單、評分、排名
-輸出在 eval/fable/<id>/；已存在的結果會跳過，中斷後重跑即可續跑。
+輸出在 lab/eval/fable/<id>/；已存在的結果會跳過，中斷後重跑即可續跑。
 """
 import argparse
 import copy
@@ -20,11 +20,11 @@ from pathlib import Path
 
 import yaml
 
-from common import KB, PIPELINE, REPORT_TYPES, load_vocab, vocab_blocks
+from common import KB, LAB, PIPELINE, REPORT_TYPES, load_vocab, vocab_blocks
 
 JUDGE = PIPELINE / "judge"
-OUT = KB / "eval" / "fable"
-SRC = KB / "fulltext" / "poc" / "clean-v2"
+OUT = LAB / "eval" / "fable"
+SRC = LAB / "fulltext" / "poc" / "clean-v2"
 ENGINES = ["sonnet-v2", "minimax-v2", "qwen-v2-think"]
 REMOVED = ["value_level", "value_reason", "reproducibility", "reproducibility_reason"]
 CARD_ORDER = ["title", "broker", "date", "series", "report_type", "primary_family", "families",
@@ -254,10 +254,10 @@ def main():
     ap.add_argument("--only", nargs="*")
     ap.add_argument("--effort", default="high")
     ap.add_argument("--model", default="claude-fable-5-2")
-    ap.add_argument("--out", default="eval/fable", help="輸出資料夾（相對 KB）")
+    ap.add_argument("--out", default="lab/eval/fable", help="輸出資料夾（相對 KB）")
     ap.add_argument("--no-cache", action="store_true", help="關閉 prompt 快取（每篇只讀一次，快取寫入是白花的）")
     ap.add_argument("--seed", default="fable-judge-v1")
-    ap.add_argument("--canaries", default="eval/fable/_canaries.json")
+    ap.add_argument("--canaries", default="lab/eval/fable/_canaries.json")
     ap.add_argument("--wait", type=int, default=900, help="撞到額度限制時等待秒數")
     ap.add_argument("--max-waits", type=int, default=24)
     args = ap.parse_args()

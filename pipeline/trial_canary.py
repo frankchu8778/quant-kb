@@ -1,6 +1,6 @@
 """試產的埋雷：在寫好的卡片上各改一處，量檢查員抓不抓得到。
 
-  python trial_canary.py make     # 產生 cards/trial/_canary/<writer>/<id>.json 與 _canaries.json
+  python trial_canary.py make     # 產生 lab/cards/trial/_canary/<writer>/<id>.json 與 _canaries.json
   python trial_canary.py score --checker deepseek-flash   # 列出每個埋雷對應的檢查結果
 
 三類（都通過程式硬檢查，只有讀原文才看得出來）：

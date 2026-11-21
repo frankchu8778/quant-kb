@@ -73,11 +73,11 @@ def serious(res):
 
 
 # ---- 校準：已知答案的卡 ----
-TRIAL_CHECK = B.KB / "eval" / "trial" / "check-deepseek-flash"
+TRIAL_CHECK = T.EVAL / "check-deepseek-flash"
 REAL_OMISSIONS = [  # 人工複核認定為真的「重要遗漏」major（pipeline/results/major_review_*.md）
-    ("20240506_国金证券_b61ef7", B.KB / "cards/trial/deepseek/20240506_国金证券_b61ef7.json",
+    ("20240506_国金证券_b61ef7", T.CARDS / "deepseek/20240506_国金证券_b61ef7.json",
      T.SRC / "20240506_国金证券_b61ef7.md", ["微盘", "微盤"]),
-    ("20240512_国金证券_35a947", B.KB / "cards/trial/deepseek/20240512_国金证券_35a947.json",
+    ("20240512_国金证券_35a947", T.CARDS / "deepseek/20240512_国金证券_35a947.json",
      T.SRC / "20240512_国金证券_35a947.md", ["社融"]),
     ("20231025_招商证券_7d3b43", B.ROOT / "cards/batch1/20231025_招商证券_7d3b43.v1.json",
      B.ROOT / "fulltext/batch1/clean/20231025_招商证券_7d3b43.md", ["10 天", "10天", "相邻", "相鄰", "泄露", "泄漏", "洩露", "洩漏"]),

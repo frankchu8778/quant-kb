@@ -8,7 +8,7 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 
 | 階段 | 指令 | 花錢嗎 | 狀態 |
 |---|---|---|---|
-| — 選檔 | `batch.py sample <batch> --n 100 --no-copy` | 否 | 可用；`--no-copy` 只記原始路徑、不複製 PDF（建議） |
+| — 選檔 | `batch.py sample <batch> --n 100` | 否 | 可用；預設只記原始路徑、不複製 PDF；`--copy` 才複製進 `inbox/` |
 | — 匯入已寫好的卡 | `adopt.py <batch> --cards … --fulltext …` | 否 | 試產的 20 張 Kimi 卡用這個登記成 `poc` 批次 |
 | 0 入庫 | `batch.py ingest <batch>` | 否 | 可用 |
 | 1 轉檔 | `batch.py convert <batch>` | 否（本機 GPU） | 可用 |
@@ -39,7 +39,7 @@ Python 一律用 `~/venvs/kb-parse/bin/python`，在 `pipeline/` 下執行。`<b
 python batch.py sample batch1 --n 100
 ```
 
-從 `.env` 的 `Research_Report_PATH` 隨機選 PDF 複製到 `inbox/batch1/`。已經在 manifest 或其他批次裡的（依檔案雜湊）不會被選到。選了哪些記在 `inbox/batch1/_selection.json`。自己放檔案的話跳過這步。
+從 `.env` 的 `Research_Report_PATH` 隨機選 PDF，只記原始路徑、不複製（轉檔時直接讀原位置；`--copy` 才複製到 `inbox/batch1/`）。已經在 manifest 或其他批次裡的（依檔案雜湊）不會被選到。選了哪些記在 `inbox/batch1/_selection.json`。自己放檔案的話跳過這步。
 
 ### 0. 入庫
 
@@ -334,16 +334,14 @@ python publish.py publish batch1     # 通過的卡 → ../kb/cards/*.md，全�
 | `adopt.py` | 把已寫好的卡登記成正式批次，只跑後半段 |
 | `skill/quant-kb/` | 全域檢索 Skill 的原始檔；`~/.claude/skills/quant-kb` 是指向它的連結 |
 | `publish.py`、`kb_CLAUDE.md` | 人工判定寫回 manifest、發布到 `../kb/`；知識庫的使用說明 |
-| `render_cards.py` | 舊格式（v3）的渲染，只給 POC 的檢索評估 `eval_retrieval.py` 用 |
-| `run.py` | 模型階段：batch 送出與收回、檢查、退回重寫、餘額檢查、埋雷、結果統計、人工複核表 |
+| `run.py` | 模型階段：batch 送出、查狀態（`status`）、收回、檢查、退回重寫、餘額檢查、埋雷、結果統計、人工複核表 |
+| `watch.sh` | 背景監控 Kimi batch：完成一個就收回、檢查、發布，全部收回才結束 |
 | `kimi_batch.py` | Kimi 的 OpenAI 格式介面：batch 任務、即時呼叫、餘額查詢 |
 | `offpeak.py`、`cn_holidays.txt` | DeepSeek 尖峰時段的閘門（先詢問）與中國法定節假日清單 |
 | `clean.py` | 去固定頁的規則 |
 | `validate.py` | 程式硬檢查 `gate_v4`：schema、引文在全文、數字在同列引文 |
 | `card_prompt_v3.md` | 寫卡 prompt（每個方法步驟附引文與章節） |
 | `check_prompt.md` | 單卡檢查 prompt |
-| `trial.py` | 試產：寫卡、程式檢查、模型檢查 |
-| `trial_canary.py` | 埋雷與抓到率 |
-| `judge_fable.py` | 三卡對比的審稿（選模型用）；也放了各家 API 的呼叫函式 |
+| `trial.py`、`trial_canary.py`、`judge_fable.py` | 名字是試產時取的；量產會用到裡面的卡片 schema、埋雷、各家 API 的呼叫與價格。試產資料本身在 `../lab/` |
 | `vocab.yaml`、`judge/strategy_types.yaml` | 方法詞彙表、策略大類 |
-| `convert.py`、`make_cards.py`、`gold_cards.py`、`eval_*.py` | POC 階段的腳本，量產不再使用 |
+| `../lab/` | 試產與實驗的封存（舊腳本、模型比較、POC 報告），見 `../lab/README.md` |

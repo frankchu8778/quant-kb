@@ -919,7 +919,7 @@ def followups(r, args):
 def review_items(args):
     """回傳 [(標籤, 檢查結果路徑, 全文路徑)]。"""
     if args.trial:
-        d = B.KB / "eval" / "trial" / "check-deepseek-flash"
+        d = T.EVAL / "check-deepseek-flash"
         return [(f"{p.parent.name} / {p.name.split('.')[0]} 寫的卡", p, T.SRC / f"{p.parent.name}.md")
                 for p in sorted(d.glob("*/*.clean.json"))]
     d = B.ROOT / "eval" / args.batch
@@ -949,7 +949,7 @@ def cmd_review(args):
                     f"- 引文：「{i['quote']}」（{i['section']}）",
                     f"- 引文在全文：{'找得到' if quote_found(i['quote'], ft) else '**找不到**'}",
                     "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""]
-    dest = PIPELINE / "results" / f"major_review_{'trial' if args.trial else args.batch}.md"
+    dest = (T.LAB / "pipeline" if args.trial else PIPELINE) / "results" / f"major_review_{'trial' if args.trial else args.batch}.md"
     import publish
     dest.write_text(publish.keep_judgments(dest, "\n".join(out)))
     print(f"{n} 條 → {dest}")
@@ -961,7 +961,7 @@ WEEKLY_RE = __import__("re").compile(r"(周报|週報|周度|月报|月度|日�
 
 def cmd_triage(args):
     if args.trial:
-        idx = json.loads((B.KB / "fulltext" / "poc" / "basic" / "_index.json").read_text())
+        idx = json.loads((T.LAB / "fulltext" / "poc" / "basic" / "_index.json").read_text())
         rows = [(idx[p.stem]["source_pdf"], json.loads(p.read_text())["report_type"])
                 for p in sorted((T.CARDS / "kimi").glob("*.json")) if ".meta" not in p.name and ".attempt" not in p.name]
     else:

@@ -8,6 +8,7 @@ import yaml
 
 KB = Path(__file__).resolve().parent.parent
 PIPELINE = KB / "pipeline"
+LAB = KB / "lab"   # 試產與實驗的封存（模型比較、單項測試）；量產流程不寫入這裡
 INBOX = KB / "inbox" / "poc"
 FULLTEXT = KB / "fulltext"
 CARDS = KB / "cards"
