@@ -32,7 +32,7 @@ def parse_review(path, source):
     """回傳 [{rid, stage, severity, type, field, verdict, note, source, item}]。
 
     條目標題：`## 3. <rid> / 第一次檢查`（檢查員的複核表）或 `## 3. <rid>`（審計的複核表）。
-    人工判定一行：`- 人工判定：＿真＿（真 / 誤報 / 吹毛求疵）`。判定詞要放在最前面，後面可以接說明。
+    人工判定一行：`- 人工判定：＿真＿（真 / 誤報 / 吹毛求疵）`。判定詞要放在最前面，後面可以接說明；說明裡寫「降為 minor」之類會改掉嚴重度。
     """
     items = []
     for block in re.split(r"\n(?=## \d+\. )", path.read_text())[1:]:
@@ -46,8 +46,12 @@ def parse_review(path, source):
         j = re.search(r"人工判定：(.*?)（真 / 誤報 / 吹毛求疵）", block)
         raw = (j.group(1) if j else "").replace("＿", " ").replace("*", "").strip()
         verdict = next((v for v in VERDICTS if raw.startswith(v)), None)   # 只認開頭；開頭認不出就當沒填，請人確認
+        severity = sev.group(1) if sev else None
+        regrade = re.search(r"(?:降為|降为|改為|改为|升為|升为)\s*(critical|major|minor)", raw)   # 說明裡寫「降為 minor」就照人工改嚴重度
+        if verdict == "真" and regrade:
+            severity = regrade.group(1)
         items.append({"rid": rid, "stage": stage, "source": f"{path.name}#{no}",
-                      "severity": sev.group(1) if sev else None, "type": sev.group(2).strip() if sev else None,
+                      "severity": severity, "type": sev.group(2).strip() if sev else None,
                       "field": field.group(1) if field else None, "verdict": verdict,
                       "note": raw[len(verdict):].strip(" ，,：:") if verdict else raw,
                       "source_says": says.group(1).strip() if says else ""})
