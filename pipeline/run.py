@@ -65,11 +65,16 @@ from common import PIPELINE
 from validate import gate_v4
 
 WRITER, CHECKER = "kimi-k3.1-pro", "deepseek-flash"
+# --via plan：改走火山 Agent Plan（headless.py 啟動 `claude -p`）。模型名稱在 agent_plan/<role>.settings.json；
+# 套餐不按 token 收費，記帳為 0；不套用 DeepSeek 尖峰規則（使用者 2026-11-23 決定）
+ROUTES = {"api": ("kimi-k3.1-pro", "deepseek-flash"), "plan": ("plan:writer", "plan:checker")}
+VIA = "api"
+QUOTA_POLL = 1800   # 套餐額度用完後，每隔幾秒再試一次
 CANARY_EVERY = 20   # 量產時每 20 張通過的卡埋 1 個雷
 AUDIT_PCT = 5       # 量產時抽 5% 通過的卡審計（PLAN：前 200 篇 5%，漏抓率穩定後降到 2%）
-PRICE_CNY = {"kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8), "MiniMax": (1.1, 4.3)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
+PRICE_CNY = {"plan": (0, 0), "kimi-batch": (7.8, 40.8), "kimi": (13, 68), "deepseek": (2, 8), "MiniMax": (1.1, 4.3)}  # 每百萬 token（輸入, 輸出），原價；離峰與 batch 折扣不計，估算偏保守
 RETRY_WAITS = [10, 30, 90]
-BILLING_HINTS = ("402", "insufficient balance", "billing")
+BILLING_HINTS = ("402", "insufficient balance", "billing", "401", "invalid api key", "authentication")  # 整批停：餘額不足或金鑰錯
 SAFETY = 1.3              # 餘額要有估計花費的幾倍才送
 BATCH_ACTUAL_RATIO = 1.66  # batch 實際花費 / 送出時的估計（batch1：¥18.11/¥10.90、¥5.21/¥3.20）
 REWRITE_SHARE = 0.25      # 估計有多少比例的篇會需要即時重寫（試產約一到兩成，取保守值）
@@ -89,6 +94,10 @@ class OffPeakWait(Exception):
     """輪到 DeepSeek 的步驟，但現在是尖峰時段。這篇先停在這裡，離峰再接續。"""
 
 
+class QuotaWait(Exception):
+    """Agent Plan 的額度用完。這篇先停在這裡，額度恢復再接續；不算失敗。"""
+
+
 class Runner:
     def __init__(self, batch, budget, dry_run=False, mode="realtime"):
         self.batch, self.budget, self.dry_run, self.mode = batch, budget, dry_run, mode
@@ -97,6 +106,7 @@ class Runner:
         self.stop_reason = None
         self.alarm = None            # 監控警報（monitor.py）：有值就不再開始新的篇
         self.ignore_alarms = False
+        self.quota_until = 0.0       # Agent Plan 額度用完：這個時間之前不再呼叫，直接讓篇停下等
         self.ctx = T.ctx()
         self.manifest = B.load()
         self._saved = {rid: copy.deepcopy(v.get("card")) for rid, v in self.manifest.items()}
@@ -118,12 +128,24 @@ class Runner:
                     raise Stop(self.stop_reason)
             if offpeak.blocked(model):
                 raise OffPeakWait()
-            out, meta = call_model(model, prompt, schema)
+            if time.time() < self.quota_until:
+                raise QuotaWait()
+            try:
+                out, meta = call_model(model, prompt, schema)
+            except QuotaWait:
+                with self.lock:
+                    self.quota_until = time.time() + QUOTA_POLL
+                raise
             cost = self.cost_cny(model, meta.get("usage"))
             with self.lock:
                 self.spent += cost
-                rec.setdefault("calls", []).append({"step": step, "model": model, "cny": cost,
-                                                    "seconds": meta.get("seconds"), "ok": out is not None})
+                entry = {"step": step, "model": meta.get("model", model), "cny": cost,
+                         "seconds": meta.get("seconds"), "ok": out is not None}
+                if meta.get("via"):
+                    entry.update(via=meta["via"], usage=meta.get("usage"))
+                if out is None and meta.get("error"):
+                    entry["error"] = meta["error"][:300]
+                rec.setdefault("calls", []).append(entry)
                 rec["cost_cny"] = round(rec.get("cost_cny", 0) + cost, 4)
             if out is not None:
                 return out
@@ -301,6 +323,10 @@ class Runner:
             rec["state"] = "waiting_offpeak"
             self.save()
             return rid, f"等離峰（{offpeak.next_offpeak():%H:%M} 起）再做 DeepSeek 檢查"
+        except QuotaWait:
+            rec["state"] = "waiting_quota"
+            self.save()
+            return rid, "Agent Plan 額度用完，等恢復再接續"
         except Stop as e:
             rec["state"] = "interrupted"
             self.save()
@@ -333,15 +359,25 @@ EFFORT = {}  # 模型名稱前綴 → 推理強度；沒列的用 high（audit.p
 
 
 def call_model(model, prompt, schema):
-    """實際送 API 的唯一入口（測試時替換這個函式）。回傳 (structured output 或 None, meta)。"""
+    """實際送 API 的唯一入口（測試時替換這個函式）。回傳 (structured output 或 None, meta)。
+
+    model 以 plan: 開頭走 Agent Plan（headless.py，每次一個新的 `claude -p` 程序），其餘走 API。"""
     try:
         effort = next((v for k, v in EFFORT.items() if model.startswith(k)), "high")
-        res, tail, secs = jf.run_deepseek(prompt, schema, effort, model)  # Kimi、DeepSeek、MiniMax 都走 Anthropic 相容端點
+        if model.startswith("plan:"):
+            import headless
+            res, tail, secs = headless.run(model.split(":", 1)[1], prompt, schema, effort)
+        else:
+            res, tail, secs = jf.run_deepseek(prompt, schema, effort, model)  # Kimi、DeepSeek、MiniMax 都走 Anthropic 相容端點
     except offpeak.PeakHours:
         raise OffPeakWait()   # 跑到一半進入尖峰：不算失敗、不重試，這篇等離峰
     except Exception as e:
+        if type(e).__name__ == "QuotaExhausted":
+            raise QuotaWait()
         return None, {"error": f"{type(e).__name__}: {str(e)[:300]}", "seconds": 0}
     meta = {"seconds": secs, "usage": (res or {}).get("usage")}
+    if (res or {}).get("via"):
+        meta.update(via=res["via"], model=f"{model}({res.get('model')})")
     out = (res or {}).get("structured_output")
     if not out:
         meta["error"] = tail[-600:]
@@ -524,31 +560,50 @@ def cmd_submit(args):
 
 
 def run_with_offpeak(r, todo, args):
-    """逐篇走流程。DeepSeek 的步驟遇到尖峰就停在那裡；加了 --wait-offpeak 會睡到離峰再接續。
+    """逐篇走流程。DeepSeek 的步驟遇到尖峰、或 Agent Plan 額度用完，篇就停在那一步；
+    加了 --wait-offpeak／--wait-quota 會睡到可以再跑時接續。
 
-    尖峰時段 Kimi 的步驟（程式檢查不過的重寫）照常做，只有 DeepSeek 的筆記與檢查會等。
+    尖峰時段 Kimi 的步驟（程式檢查不過的重寫）照常做，只有直接打 API 的 DeepSeek 筆記與檢查會等。
     """
     r.ignore_alarms = getattr(args, "ignore_alarms", False)
     if r.check_alarms():
         print("開始前就有監控警報，這次不處理任何篇。看過、處理過之後要繼續，加 --ignore-alarms")
         return
-    for _ in range(4):   # 一天最多跨兩個尖峰時段，4 輪足夠
+    deadline = time.time() + getattr(args, "max_wait_quota", 0) * 60
+    for _ in range(200):   # 尖峰一天最多兩段；額度每 QUOTA_POLL 試一次，直到 deadline
         if r.alarm:
             return
         with ThreadPoolExecutor(args.workers) as ex:
             for rid, status in ex.map(r.process, todo):
                 print(f"{rid}  {status}", flush=True)
-        todo = [rid for rid in todo if r.manifest[rid].get("card", {}).get("state") == "waiting_offpeak"]
-        if not todo:
+        state = lambda rid: r.manifest[rid].get("card", {}).get("state")
+        off = [rid for rid in todo if state(rid) == "waiting_offpeak"]
+        quota = [rid for rid in todo if state(rid) == "waiting_quota"]
+        if not off and not quota:
             return
-        until = offpeak.next_offpeak()
-        if not getattr(args, "wait_offpeak", False):
-            print(f"\n{len(todo)} 篇停在 DeepSeek 檢查之前：現在是尖峰時段，{until:%H:%M} 起是離峰。"
-                  f"到時候重跑同一個指令即可（或加 --wait-offpeak 讓程式自己等）")
+        waits, stop = [], False
+        if off:
+            until = offpeak.next_offpeak()
+            if getattr(args, "wait_offpeak", False):
+                waits.append(max(0, (until - datetime.now(offpeak.TZ)).total_seconds()) + 30)
+            else:
+                stop = True
+                print(f"\n{len(off)} 篇停在 DeepSeek 檢查之前：現在是尖峰時段，{until:%H:%M} 起是離峰。"
+                      f"到時候重跑同一個指令即可（或加 --wait-offpeak 讓程式自己等）")
+        if quota:
+            if getattr(args, "wait_quota", False) and time.time() + QUOTA_POLL < deadline:
+                waits.append(QUOTA_POLL)
+            else:
+                stop = True
+                print(f"\n{len(quota)} 篇停下：Agent Plan 額度用完。額度恢復後重跑同一個指令即可"
+                      f"（或加 --wait-quota 讓程式每 {QUOTA_POLL // 60} 分鐘試一次，最多等 --max-wait-quota 分鐘）")
+        if stop:
             return
-        secs = max(0, (until - datetime.now(offpeak.TZ)).total_seconds()) + 30
-        print(f"\n{len(todo)} 篇等離峰：睡到北京時間 {until:%H:%M}（約 {secs / 60:.0f} 分鐘）", flush=True)
+        secs = min(waits)
+        print(f"\n{len(off) + len(quota)} 篇等待中：{secs / 60:.0f} 分鐘後再試", flush=True)
         time.sleep(secs)
+        r.quota_until = 0.0
+        todo = off + quota
 
 
 def collect_one(r, e, info):
@@ -703,9 +758,10 @@ def cmd_notes(args):
         raise SystemExit("真的送出時必須給 --budget")
     if offpeak.blocked(CHECKER):
         raise SystemExit(offpeak.message())
-    bal = KB.deepseek_balance()
-    if bal < est * SAFETY:
-        raise SystemExit(f"DeepSeek 餘額 ¥{bal:.2f} 不足（要求 ≥ ¥{est * SAFETY:.2f}），沒有送出")
+    if VIA != "plan":
+        bal = KB.deepseek_balance()
+        if bal < est * SAFETY:
+            raise SystemExit(f"DeepSeek 餘額 ¥{bal:.2f} 不足（要求 ≥ ¥{est * SAFETY:.2f}），沒有送出")
 
     def one(rid):
         rec, ev = {}, r.paths(rid)[1]
@@ -715,6 +771,8 @@ def cmd_notes(args):
             return rid, f"停下：{e}", 0.0
         except OffPeakWait:
             return rid, "進入尖峰時段，沒有跑", 0.0
+        except QuotaWait:
+            return rid, "Agent Plan 額度用完，沒有跑", 0.0
         if out is None:
             return rid, "失敗", rec.get("cost_cny", 0.0)
         (ev / "notes_meta.json").write_text(json.dumps(
@@ -750,7 +808,9 @@ def cmd_cards(args):
         raise SystemExit("真的送出時必須給 --budget")
     unwritten = [r.manifest[rid]["chars_clean"] for rid in todo
                  if not (B.ROOT / "cards" / args.batch / f"{rid}.json").exists()]
-    if not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇", write_chars=unwritten):
+    if VIA == "plan":
+        print("走 Agent Plan：寫卡與檢查用套餐額度，不查 Kimi／DeepSeek 餘額；--budget 只管 MiniMax 審計")
+    elif not preflight(chars, "kimi", f"即時處理 {len(todo)} 篇", write_chars=unwritten):
         raise SystemExit("餘額不足，沒有送出")
     run_with_offpeak(r, todo, args)
     followups(r, args)
@@ -855,7 +915,8 @@ def canary_round(r, batch, every):
     if not picks:
         return 0
     # 邏輯類埋雷要 Kimi 改寫一小段（約 ¥0.4），每個埋雷要 DeepSeek 檢查一次（尖峰約 ¥0.15）
-    if not preflight([], None, f"埋雷 {len(picks)} 張", kimi_extra=0.4 * len(picks) / 3, ds_extra=0.15 * len(picks)):
+    if VIA != "plan" and not preflight([], None, f"埋雷 {len(picks)} 張", kimi_extra=0.4 * len(picks) / 3,
+                                       ds_extra=0.15 * len(picks)):
         print("餘額不足，埋雷沒有送出")
         return 0
     n = 0
@@ -892,6 +953,9 @@ def canary_round(r, batch, every):
             break
         except OffPeakWait:
             print(f"停下：{offpeak.message()}")
+            break
+        except QuotaWait:
+            print("停下：Agent Plan 額度用完，下次跑同一個指令會補上")
             break
     return n
 
@@ -995,7 +1059,10 @@ def main():
         if name in ("probe", "submit", "collect", "notes", "cards", "canary"):
             p.add_argument("--budget", type=float, help="這次執行的花費上限（人民幣）")
         if name in ("cards", "collect", "notes"):
-            p.add_argument("--workers", type=int, default=5)
+            p.add_argument("--workers", type=int, help="同時跑幾篇（預設：API 5、Agent Plan 1）")
+        if name in ("cards", "collect", "notes", "canary"):
+            p.add_argument("--via", choices=list(ROUTES), default="api",
+                           help="api：直接打 Kimi／DeepSeek API（花錢）；plan：走火山 Agent Plan（claude -p，用套餐額度）")
         if name in ("cards", "collect"):
             p.add_argument("--ignore-alarms", action="store_true", help="看過監控警報、處理過之後繼續跑")
             p.add_argument("--no-canary", action="store_true", help="這次不自動埋雷")
@@ -1019,7 +1086,15 @@ def main():
                            help="允許在 DeepSeek 尖峰時段呼叫（原價）。只在使用者明說可以時才加")
         if name in ("collect", "cards"):
             p.add_argument("--wait-offpeak", action="store_true", help="遇到尖峰就睡到離峰再接續 DeepSeek 的步驟")
+            p.add_argument("--wait-quota", action="store_true",
+                           help="Agent Plan 額度用完時，每 30 分鐘再試一次，直到 --max-wait-quota")
+            p.add_argument("--max-wait-quota", type=int, default=600, help="等額度最多幾分鐘（預設 600）")
     args = ap.parse_args()
+    global WRITER, CHECKER, VIA
+    VIA = getattr(args, "via", "api")
+    WRITER, CHECKER = ROUTES[VIA]
+    if hasattr(args, "workers") and args.workers is None:
+        args.workers = 1 if VIA == "plan" else 5
     offpeak.allow_from_flag(getattr(args, "allow_peak", False))
     globals()[f"cmd_{args.cmd}"](args)
 

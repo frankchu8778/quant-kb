@@ -240,6 +240,16 @@ python run.py cards batch1 --budget 150
 
 batch 等太久時用。每篇多約 ¥0.43。
 
+### 走火山 Agent Plan（套餐額度）
+
+```bash
+python headless.py ping writer          # 第一次：確認連線與模型名稱
+python headless.py ping checker
+python run.py cards sub1 --via plan --budget 5 --limit 3 --wait-quota
+```
+
+寫卡與檢查改用套餐，每篇每一步啟動一次 `claude -p`（不給工具、空資料夾、不存對話），程式檢查與狀態仍由 `run.py` 做。預設同時 1 篇；額度用完的篇停在 `waiting_quota`，不算失敗。`--budget` 只管 MiniMax 審計。不套用 DeepSeek 尖峰規則。設定與防跑偏的對照見 `docs/PIPELINE.md`「走火山 Agent Plan」。
+
 ### 看結果
 
 ```bash
@@ -338,6 +348,7 @@ python publish.py publish batch1     # 通過的卡 → ../kb/cards/*.md，全�
 | `watch.sh` | 背景監控 Kimi batch：完成一個就收回、檢查、發布，全部收回才結束 |
 | `kimi_batch.py` | Kimi 的 OpenAI 格式介面：batch 任務、即時呼叫、餘額查詢 |
 | `offpeak.py`、`cn_holidays.txt` | DeepSeek 尖峰時段的閘門（先詢問）與中國法定節假日清單 |
+| `headless.py`、`agent_plan/` | Agent Plan 路線（`--via plan`）：每步啟動一次 `claude -p`、隔離設定、系統提示 |
 | `clean.py` | 去固定頁的規則 |
 | `validate.py` | 程式硬檢查 `gate_v4`：schema、引文在全文、數字在同列引文 |
 | `card_prompt_v3.md` | 寫卡 prompt（每個方法步驟附引文與章節） |

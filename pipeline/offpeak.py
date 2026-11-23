@@ -94,6 +94,8 @@ def ask(now=None):
 
 
 def is_deepseek(model):
+    # 只管直接打 DeepSeek API 的呼叫。走火山 Agent Plan 的（run.py 的 "plan:checker"）不受限：
+    # 套餐按點數扣、不是原價，使用者 2026-11-23 決定不套用尖峰規則
     return str(model).startswith("deepseek")
 
 

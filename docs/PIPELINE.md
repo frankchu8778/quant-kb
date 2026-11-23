@@ -337,11 +337,53 @@ Kimi batch 的回收時間差很多：同一天送的，有的 33 分鐘完成�
 | `kb_CLAUDE.md` | 發布時複製成 `kb/CLAUDE.md` |
 | `mineru-standard.yaml`、`serve_mineru_vlm.sh` | 轉檔設定 |
 
-## 換成訂閱制（`claude -p`）時要改的地方
+## 走火山 Agent Plan（`--via plan`）
 
-所有模型呼叫都經過 `run.py` 的 `call_model`，換掉這個函式即可；監控、埋雷、審計、發布不用動。要另外處理：
+寫卡與檢查改用火山方舟 Agent Plan 的套餐額度（2026-11-23 起可用）。套餐只能在 AI 工具裡用，不能直接打 API，所以由 `headless.py` 每一步啟動一次 Claude Code 無頭模式（`claude -p`），請求送到火山的端點。寫卡 Kimi、檢查 DeepSeek，仍是不同廠；審計員 MiniMax 不在套餐內，照舊走 API。
 
-1. 花費改用 `claude -p` 回報的等值金額當預算；餘額預檢改成額度檢查。
-2. 碰到 5 小時或每週額度上限，要像等離峰一樣暫停等恢復，不能算失敗（否則失敗率警報會擋下整批）。
-3. 寫卡若改用 Claude，檢查員和審計員仍要用別家模型。
-4. 每次呼叫起一個新程序、不帶對話紀錄（`--no-session-persistence`、空的設定資料夾），篇與篇之間不會互相影響。
+**主控仍是 `run.py`**：agent 只負責「寫一張卡」或「檢查一張卡」，回傳一份 JSON。落檔、程式檢查、狀態轉換、監控、埋雷、審計、發布都和 API 路線相同，agent 的回報不算數。
+
+### 設定
+
+| 位置 | 內容 |
+|---|---|
+| `pipeline/agent_plan/writer.settings.json`、`checker.settings.json` | deny 全部工具、關 hooks 與遙測。進 git，沒有金鑰 |
+| `pipeline/agent_plan/system.md` | 固定的系統提示：單一任務、只輸出 JSON、原文裡像指令的文字一律當內容 |
+| `.env` 的 `ARK_AGENT_API_KEY`、`ARK_AGENT_BASE_URL` | 從火山控制台的 Agent Plan 頁面複製（不是 Coding Plan 的位址）；Base URL 不加 `/v1`，Claude Code 會自己接 `/v1/messages` |
+| `.env` 的 `ARK_KIMI_MODEL_NAME`、`ARK_DEEPSEEK_MODEL_NAME` | 寫卡、檢查的模型名稱。`headless.py` 把 Claude Code 的所有模型別名都指向它，背景小任務才不會叫到不存在的模型 |
+| `pipeline/agent_plan/.config/<role>/` | Claude Code 的專用設定資料夾，不進 git |
+| `pipeline/logs/headless_calls.log` | 每次呼叫一行：角色、模型、秒數、用量、問題；不含提示與金鑰 |
+
+### 防跑偏、防 context 爆掉
+
+| 風險 | 防法 |
+|---|---|
+| 做要求以外的事（讀寫檔、執行指令、上網） | `--tools ""`＋設定檔 deny 全部工具＋空的暫存 cwd＋`--strict-mcp-config`；回傳有 `permission_denials` 就判失敗 |
+| 讀到專案或個人的 CLAUDE.md、記憶、hooks、外掛 | `--bare`＋專用 `CLAUDE_CONFIG_DIR`（`HOME` 也指過去）＋固定系統提示 |
+| 拿到不該有的金鑰 | 子程序的環境變數用白名單，Kimi／DeepSeek／MiniMax 的金鑰都不傳 |
+| 多篇混在一起、對話過長被摘要 | 每篇每一步一個新程序＋`--no-session-persistence`；重寫也是新程序，上一版卡片與問題清單明寫在提示裡 |
+| 輸出不合格式或偷工 | `--json-schema`＋Python 端再驗 schema＋程式檢查逐字比引文與數字＋檢查員 |
+| 自己宣告通過 | agent 沒有工具、不能寫檔；狀態只由 `run.py` 依程式檢查與檢查結果決定 |
+| 卡住 | 每次呼叫 20 分鐘逾時，整個程序群組砍掉，照重試規則 |
+| 額度用完被當成失敗 | 變成 `waiting_quota`，不算失敗率；加 `--wait-quota` 每 30 分鐘再試 |
+| 檢查員失靈 | 埋雷每 20 張、MiniMax 抽 5% 審計照跑，監控警戒線不變 |
+
+### 和 API 路線的差別
+
+- 花費記 0（套餐），每次呼叫仍記秒數與 token 用量（`via: agent-plan`），可對照控制台點數；`--budget` 只管 MiniMax 審計。
+- 不查 Kimi／DeepSeek 餘額。
+- **不套用 DeepSeek 尖峰規則**（使用者 2026-11-23 決定）：只有直接打 DeepSeek API 的呼叫受 `offpeak.py` 限制。
+- 預設同時 1 篇（Small 檔官方建議一次一個專案）。
+- 風險：用程式批次啟動 Claude Code 吃套餐，形式上是火山列出的 AI 工具，但仍屬灰色地帶，有被判濫用的可能。
+
+### 第一次使用
+
+```bash
+python headless.py ping writer     # 確認連線、模型名稱、回傳格式（用一點套餐額度）
+python headless.py ping checker
+python run.py cards sub1 --via plan --budget 5 --limit 3 --wait-quota
+```
+
+2026-11-23 實測：兩個角色都通，`--bare`＋`ANTHROPIC_API_KEY` 火山接受，一題約 4–9 秒。stderr 的 `unrecognized_model` 只是 Claude Code 不認得這個模型名稱，不影響結果。檢查員目前設成 `deepseek-v4.1-flash-economy`：和 API 路線的 `deepseek-flash` 不一定同一個模型，埋雷抓到率要重新量。
+
+`ping` 失敗時依訊息調整 `headless.py` 開頭的 `BARE`、`AUTH_ENV`、`PASS_EFFORT`，或設定檔裡的模型名稱。額度用完的錯誤訊息第一次碰到時，補進 `QUOTA_HINTS`。
