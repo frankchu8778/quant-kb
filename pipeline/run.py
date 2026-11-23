@@ -95,7 +95,11 @@ class OffPeakWait(Exception):
 
 
 class QuotaWait(Exception):
-    """Agent Plan 的額度用完。這篇先停在這裡，額度恢復再接續；不算失敗。"""
+    """Agent Plan 的額度用完，或控速判定再送會超過。這篇先停在這裡，之後再接續；不算失敗。
+    until：控速算出可以再送的時間（epoch 秒）；額度真的用完時是 None，改每 QUOTA_POLL 秒試一次。"""
+    def __init__(self, until=None):
+        super().__init__()
+        self.until = until
 
 
 def force_must_capture(res, fulltext):
@@ -134,6 +138,7 @@ class Runner:
         self.alarm = None            # 監控警報（monitor.py）：有值就不再開始新的篇
         self.ignore_alarms = False
         self.quota_until = 0.0       # Agent Plan 額度用完：這個時間之前不再呼叫，直接讓篇停下等
+        self.quota_note = ""         # 控速或額度的說明，等待時印出來
         self.ctx = T.ctx()
         self.manifest = B.load()
         self._saved = {rid: copy.deepcopy(v.get("card")) for rid, v in self.manifest.items()}
@@ -159,9 +164,10 @@ class Runner:
                 raise QuotaWait()
             try:
                 out, meta = call_model(model, prompt, schema)
-            except QuotaWait:
+            except QuotaWait as e:
                 with self.lock:
-                    self.quota_until = time.time() + QUOTA_POLL
+                    self.quota_until = max(self.quota_until, e.until or time.time() + QUOTA_POLL)
+                    self.quota_note = str(e.__cause__ or "")[:300]
                 raise
             cost = self.cost_cny(model, meta.get("usage"))
             with self.lock:
@@ -400,8 +406,8 @@ def call_model(model, prompt, schema):
     except offpeak.PeakHours:
         raise OffPeakWait()   # 跑到一半進入尖峰：不算失敗、不重試，這篇等離峰
     except Exception as e:
-        if type(e).__name__ == "QuotaExhausted":
-            raise QuotaWait()
+        if type(e).__name__ in ("QuotaExhausted", "PaceWait"):
+            raise QuotaWait(getattr(e, "until", None)) from e
         return None, {"error": f"{type(e).__name__}: {str(e)[:300]}", "seconds": 0}
     meta = {"seconds": secs, "usage": (res or {}).get("usage")}
     if (res or {}).get("via"):
@@ -619,8 +625,12 @@ def run_with_offpeak(r, todo, args):
                 print(f"\n{len(off)} 篇停在 DeepSeek 檢查之前：現在是尖峰時段，{until:%H:%M} 起是離峰。"
                       f"到時候重跑同一個指令即可（或加 --wait-offpeak 讓程式自己等）")
         if quota:
-            if getattr(args, "wait_quota", False) and time.time() + QUOTA_POLL < deadline:
-                waits.append(QUOTA_POLL)
+            # 控速給了時間就等到那時候；額度真的用完則每 QUOTA_POLL 秒試一次
+            qwait = max(60.0, r.quota_until - time.time() + 30) if r.quota_until else QUOTA_POLL
+            if getattr(r, "quota_note", ""):
+                print(f"\n{r.quota_note}", flush=True)
+            if getattr(args, "wait_quota", False) and time.time() + qwait < deadline:
+                waits.append(qwait)
             else:
                 stop = True
                 print(f"\n{len(quota)} 篇停下：Agent Plan 額度用完。額度恢復後重跑同一個指令即可"
