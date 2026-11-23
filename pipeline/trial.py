@@ -36,9 +36,11 @@ s, arr, obj, enum = jf.s, jf.arr, jf.obj, jf.enum
 
 
 def card_v4_schema(vocab, st):
-    """v3 加上：每個方法步驟附引文與章節。"""
+    """v3 加上：每個方法步驟附引文與章節；市場條件（結論依賴的大陸市場事實，附引文，2026-11-23 起）。"""
     sc = copy.deepcopy(jf.card_v3_schema(vocab, st))
     sc["properties"]["method_steps"] = arr(obj({"step": s, "quote": s, "section": s}))
+    sc["properties"]["market_conditions"] = arr(obj({"condition": s, "quote": s, "section": s}))
+    sc["required"] = list(sc["properties"])
     return sc
 
 

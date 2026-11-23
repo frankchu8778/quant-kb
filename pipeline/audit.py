@@ -205,6 +205,9 @@ def cmd_review(args):
                                        or "同欄位沒有提過"),
                     "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""]
     dest = PIPELINE / "results" / f"audit_review_{args.batch}.md"
+    if n == 0 and not dest.exists():   # 沒有要複核的就不產生空檔
+        print(f"0 條，不產生 {dest.name}")
+        return
     import publish
     dest.write_text(publish.keep_judgments(dest, "\n".join(out)))
     print(f"{n} 條 → {dest}")

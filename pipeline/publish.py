@@ -196,6 +196,11 @@ def render(rid, v, c, vocab, st):
         out += ["## 关键结果", "", "| 指标 | 数值 | 条件 |", "|---|---|---|"]
         out += [f"| {r['metric']} | {r['value']} | {r['context']} |".replace("\n", " ") for r in c["key_results"]]
         out += ["", "原文依据：", ""] + [f"- {r['metric']}：「{r['quote']}」".replace("\n", " ") for r in c["key_results"]] + [""]
+    if c.get("market_conditions"):   # 2026-11-23 之後寫的卡才有
+        out += ["## 市场条件", "", "结论依赖的中国大陆市场条件（原文事实）。用到其他市场前，先看这些条件在目标市场是否成立。", ""]
+        for m in c["market_conditions"]:
+            out += [f"- {m['condition']}", f"  - 原文（{m['section']}）：「{m['quote']}」"]
+        out += [""]
     out += ["## 局限", ""] + [f"- {x}" for x in c["limitations"]] + [""]
     if c["implementation_gaps"]:
         out += ["## 复现缺口（原文没交代的）", ""] + [f"- {x}" for x in c["implementation_gaps"]] + [""]

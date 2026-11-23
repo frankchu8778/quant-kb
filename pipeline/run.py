@@ -950,6 +950,9 @@ def cmd_review(args):
                     f"- 引文在全文：{'找得到' if quote_found(i['quote'], ft) else '**找不到**'}",
                     "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""]
     dest = (T.LAB / "pipeline" if args.trial else PIPELINE) / "results" / f"major_review_{'trial' if args.trial else args.batch}.md"
+    if n == 0 and not dest.exists():   # 沒有要複核的就不產生空檔
+        print(f"0 條，不產生 {dest.name}")
+        return
     import publish
     dest.write_text(publish.keep_judgments(dest, "\n".join(out)))
     print(f"{n} 條 → {dest}")

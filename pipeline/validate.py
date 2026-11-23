@@ -137,7 +137,8 @@ def gate_v4(card, fulltext, schema):
     ft_norm = _norm(fulltext)
     quotes = ([(f"key_results.{i}", r["quote"]) for i, r in enumerate(card["key_results"])] +
               [(f"evidence_quotes.{i}", r["quote"]) for i, r in enumerate(card["evidence_quotes"])] +
-              [(f"method_steps.{i}", r["quote"]) for i, r in enumerate(card["method_steps"])])
+              [(f"method_steps.{i}", r["quote"]) for i, r in enumerate(card["method_steps"])] +
+              [(f"market_conditions.{i}", r["quote"]) for i, r in enumerate(card.get("market_conditions") or [])])
     for path, q in quotes:
         if "..." in q or "……" in q or "…" in q:
             problems.append(f"{path}.quote 用省略號拼接：{q[:60]}")
