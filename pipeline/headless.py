@@ -95,11 +95,19 @@ def child_env(role):
     return out
 
 
+def explicit_types(schema):
+    """火山的端點要求每個欄位都明寫 type：只有 enum 的欄位（例如標籤）不補，整個請求會回 400
+    「A parameter specified in the request is not valid」（2026-11-23 實測）。只用在送出的 schema；
+    回來後仍用原本的 schema 驗證。"""
+    from kimi_batch import moonshot_schema
+    return moonshot_schema(schema)
+
+
 def command(role, schema, effort):
     cmd = [claude_bin(), "-p", "--model", model_of(role), "--settings", str(settings_path(role)),
            "--system-prompt-file", str(AGENT_DIR / "system.md"), "--tools", "", "--strict-mcp-config",
            "--no-session-persistence", "--output-format", "json",
-           "--json-schema", json.dumps(schema, ensure_ascii=False)]
+           "--json-schema", json.dumps(explicit_types(schema), ensure_ascii=False)]
     if BARE:
         cmd.insert(2, "--bare")
     else:

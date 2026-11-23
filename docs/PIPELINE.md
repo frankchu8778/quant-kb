@@ -384,6 +384,8 @@ python headless.py ping checker
 python run.py cards sub1 --via plan --budget 5 --limit 3 --wait-quota
 ```
 
-2026-11-23 實測：兩個角色都通，`--bare`＋`ANTHROPIC_API_KEY` 火山接受，一題約 4–9 秒。stderr 的 `unrecognized_model` 只是 Claude Code 不認得這個模型名稱，不影響結果。檢查員目前設成 `deepseek-v4.1-flash-economy`：和 API 路線的 `deepseek-flash` 不一定同一個模型，埋雷抓到率要重新量。
+2026-11-23 實測：兩個角色都通，`--bare`＋`ANTHROPIC_API_KEY` 火山接受，一題約 4–9 秒。stderr 的 `unrecognized_model` 只是 Claude Code 不認得這個模型名稱，不影響結果。檢查員設成 `deepseek-v4.1-flash-economy`：使用者說明和一般版能力相同、只是較慢；埋雷照常持續監控。
+
+火山的端點要求 schema 每個欄位都明寫 `type`（只有 enum 的欄位不補，整個請求回 400「A parameter specified in the request is not valid」），`headless.py` 送出前會自動補上，驗證仍用原 schema。
 
 `ping` 失敗時依訊息調整 `headless.py` 開頭的 `BARE`、`AUTH_ENV`、`PASS_EFFORT`，或設定檔裡的模型名稱。額度用完的錯誤訊息第一次碰到時，補進 `QUOTA_HINTS`。
