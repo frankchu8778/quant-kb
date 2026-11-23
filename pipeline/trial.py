@@ -50,6 +50,9 @@ def check_schema():
                            "card_says": s, "source_says": s, "quote": s, "section": s})),
         "verdict": enum(["pass", "revise", "reject"]),
         "borrower_test": obj({"verdict": enum(["correct", "partial", "wrong"]), "reason": s}),
+        # 筆記的必須涵蓋要點逐條對照（2026-11-24 起）：missing 且引文在原文裡，run.py 一律當 major 退回
+        "must_capture_check": arr(obj({"point": s, "status": enum(["covered", "missing"]),
+                                       "missing_part": s, "quote": s, "section": s})),
     })
 
 

@@ -62,7 +62,7 @@ import offpeak
 import trial as T
 import trial_canary as TC
 from common import PIPELINE
-from validate import gate_v4
+from validate import _norm as vnorm, gate_v4, quote_found
 
 WRITER, CHECKER = "kimi-k3.1-pro", "deepseek-flash"
 # --via plan：改走火山 Agent Plan（headless.py 啟動 `claude -p`）。模型名稱在 agent_plan/<role>.settings.json；
@@ -96,6 +96,33 @@ class OffPeakWait(Exception):
 
 class QuotaWait(Exception):
     """Agent Plan 的額度用完。這篇先停在這裡，額度恢復再接續；不算失敗。"""
+
+
+def force_must_capture(res, fulltext):
+    """必須涵蓋的要點沒寫到，一律當 major（使用者 2026-11-24 決定）。
+
+    檢查員對「重要遗漏」的嚴重度在 major／minor 邊界上會跳（TODO 28；cmp3 的招商卡把「相鄰 10 天樣本剔除」
+    判 minor 放行）。所以不看它判的嚴重度：`must_capture_check` 標 missing、且引文逐字在原文裡的，
+    程式補一條 major 的問題，pass 改成 revise。引文比不到的不採用（可能是筆記本身記錯），只記在 must_capture_unverified。
+    模型原本的判定留在 model_verdict。"""
+    ft = vnorm(fulltext)
+    forced, unverified = [], []
+    for m in res.get("must_capture_check") or []:
+        if m.get("status") != "missing":
+            continue
+        if not quote_found(m.get("quote"), ft):
+            unverified.append(m)
+            continue
+        forced.append({"field": "must_capture", "type": "重要遗漏", "severity": "major",
+                       "card_says": "（卡片沒寫到）", "source_says": f"{m['point']}；缺：{m.get('missing_part') or '—'}",
+                       "quote": m["quote"], "section": m.get("section", ""), "forced_by": "code"})
+    if not forced and not unverified:
+        return res
+    res = {**res, "issues": res["issues"] + forced, "model_verdict": res["verdict"],
+           "must_capture_unverified": unverified}
+    if forced and res["verdict"] == "pass":
+        res["verdict"] = "revise"
+    return res
 
 
 class Runner:
@@ -245,10 +272,11 @@ class Runner:
     def check(self, rid, fulltext, card, notes, rec, step):
         n = json.dumps({"reference_card": notes["reference_card"], "must_capture": notes["must_capture"]},
                        ensure_ascii=False, indent=2)
-        return self.call(CHECKER, jf.fill((PIPELINE / "check_prompt.md").read_text(), methods=self.ctx.meths,
-                                          report_id=rid, fulltext=fulltext, notes=n,
-                                          card=json.dumps(card, ensure_ascii=False, indent=2)),
-                         T.check_schema(), rec, step)
+        out = self.call(CHECKER, jf.fill((PIPELINE / "check_prompt.md").read_text(), methods=self.ctx.meths,
+                                         report_id=rid, fulltext=fulltext, notes=n,
+                                         card=json.dumps(card, ensure_ascii=False, indent=2)),
+                        T.check_schema(), rec, step)
+        return force_must_capture(out, fulltext) if out is not None else None
 
     def process(self, rid):
         """一篇研報走完整個流程。每一步的產物都落檔，重跑時從缺的那一步接續。"""

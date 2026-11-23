@@ -26,6 +26,12 @@
   - 类型：方法对象错误 / 数字张冠李戴 / 引用不支持 / 标签错误 / 重要遗漏 / 其他
   - 严重度：`critical`（会让借用者理解错或照着做错）/ `major`（明显不准确，但不至于误导）/ `minor`（次要）
 - `verdict`：`pass`（没有 critical 和 major）/ `revise`（有 major，没有 critical）/ `reject`（有 critical）
+- `must_capture_check`：把笔记里的 `must_capture` 逐条对照卡片，每条一项。
+  - `status`：卡片有写到就是 `covered`；没写到就是 `missing`。一个要点含多个条件（例如几个参数、几步处理）时，**任何一个条件没写到就是 `missing`**。
+  - `missing_part`：缺的是哪一部分（`covered` 时留空）。
+  - `quote`、`section`：`missing` 时附原文逐字引用（10–80 字）与章节标题，证明原文确实有这一部分；`covered` 时留空。
+  - 笔记的要点如果其实不是原文的主要内容、或原文并没有这样说，标 `covered` 并在 `missing_part` 写明原因，不要硬列为 `missing`。
+  - 标为 `missing` 的要点，程序会一律当成 major 退回重写，不看你在 `issues` 里给的严重度。
 - `borrower_test`：一个只读这张卡片、不读全文的 agent，会不会对这篇研报的思路形成正确的理解？（correct / partial / wrong，一两句话说明）
 
 说明文字用繁體中文书写（原文与卡片引用保持原样）。
