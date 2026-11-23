@@ -102,19 +102,38 @@ class QuotaWait(Exception):
         self.until = until
 
 
+_T2S = None
+
+
+def _t2s():
+    global _T2S
+    if _T2S is None:
+        import opencc
+        _T2S = opencc.OpenCC("t2s").convert
+    return _T2S
+
+
 def force_must_capture(res, fulltext):
     """必須涵蓋的要點沒寫到，一律當 major（使用者 2026-11-24 決定）。
 
     檢查員對「重要遗漏」的嚴重度在 major／minor 邊界上會跳（TODO 28；cmp3 的招商卡把「相鄰 10 天樣本剔除」
     判 minor 放行）。所以不看它判的嚴重度：`must_capture_check` 標 missing、且引文逐字在原文裡的，
     程式補一條 major 的問題，pass 改成 revise。引文比不到的不採用（可能是筆記本身記錯），只記在 must_capture_unverified。
-    模型原本的判定留在 model_verdict。"""
+    模型原本的判定留在 model_verdict。
+
+    檢查員的說明寫繁體，引文常被一起轉成繁體（sub1a 國盛卡 2026-11-24：2 條真漏寫因此比不到），
+    所以引文先轉簡體再比。重跑時先拿掉上次補的問題，結果不會重複疊加。"""
     ft = vnorm(fulltext)
+    t2s = _t2s()
+    res = {**res, "issues": [i for i in res["issues"] if i.get("forced_by") != "code"],
+           "verdict": res.get("model_verdict", res["verdict"])}
+    res.pop("model_verdict", None)
+    res.pop("must_capture_unverified", None)
     forced, unverified = [], []
     for m in res.get("must_capture_check") or []:
         if m.get("status") != "missing":
             continue
-        if not quote_found(m.get("quote"), ft):
+        if not (quote_found(m.get("quote"), ft) or quote_found(t2s(m.get("quote") or ""), ft)):
             unverified.append(m)
             continue
         forced.append({"field": "must_capture", "type": "重要遗漏", "severity": "major",
@@ -323,7 +342,8 @@ class Runner:
             c2p = ev / "check2.json"
             if not c2p.exists():
                 if not v1.exists():
-                    issues = [i for i in c1["issues"] if i["severity"] != "minor"]
+                    # 退回時至少要有問題清單：檢查員判 revise 卻只列 minor 時，把全部問題都給寫卡員
+                    issues = [i for i in c1["issues"] if i["severity"] != "minor"] or c1["issues"]
                     extra = ("\n\n## 你上一次写的卡片\n\n" + json.dumps(card, ensure_ascii=False, indent=2) +
                              "\n\n## 审核员指出的问题\n\n" +
                              "\n".join(f"- [{i['severity']}] {i['field']}：卡片写「{i['card_says']}」；原文实际是：{i['source_says']}（原文：「{i['quote']}」，{i['section']}）"
