@@ -8,7 +8,7 @@
   python batch.py quality <batch>                 # 階段 1b：轉檔品質閘，不合格的標成 hold
   python batch.py clean   <batch>                 # 階段 2：去固定頁
   python batch.py status  <batch> [--budget 300]  # 各階段篇數、hold 原因、寫卡與檢查的花費估算
-  python batch.py release <batch> <id> [<id> ...] # 人工確認後解除 hold，回到被擋下之前的階段
+  python batch.py release <batch> <id> [<id> ...] # 人工確認後解除 hold，回到被擋下之前的階段（超長篇要加 --force）
   python batch.py holds   <batch>                 # 列出被擋下的篇，並把它們的 PDF 移到 hold/<batch>/
 
 每個指令都可以重跑：已完成的篇會跳過，只處理還沒做的。
@@ -54,6 +54,11 @@ MIN_CHARS = 2000             # 全文太短：轉檔失敗或只有封面
 MIN_CHARS_PER_PAGE = 150     # 每頁字數太少：多半是掃描版且 OCR 沒出字
 MIN_CJK_OR_LATIN_PCT = 30    # 中文加英文字母佔比太低：多半是表格或亂碼
 MAX_CHARS = 120_000          # POC 最長約 4 萬字；更長的還沒測過模型上限，先擋下來人工確認
+# 超長篇：全文超過 MAX_CHARS 的篇，幾乎都是因子手冊、合集（一篇列上百個因子，一張卡摘不完）。
+# 先不處理：要等拆章節寫卡（TODO 第 23 項）做好再放行，所以 release 預設不放行這類。
+LONG_KIND = "超長篇"
+LONG_NOTE = ("全文超過 12 萬字，通常是因子手冊或合集，一張卡摘不完。目前先不處理，"
+             "等拆章節寫卡（TODO 第 23 項）做好再放行；硬要照一般流程寫一張卡才加 --force。")
 
 # 重複性檢查。相似度 = 兩篇文字的 5 字片段集合的重疊比例（Jaccard），用 MinHash 估計，誤差約 ±3 個百分點。
 DUP_FULL_THRESHOLD = 0.60    # 全文相似度達到就 hold（暫定，使用者指定）
@@ -147,9 +152,11 @@ def selections():
     return {p.parent.name: json.loads(p.read_text()) for p in (ROOT / "inbox").glob("*/_selection.json")}
 
 
-def hold(v, reason):
-    """擋下一篇並記住它原本在哪個階段，release 時回得去。"""
+def hold(v, reason, kind=None):
+    """擋下一篇並記住它原本在哪個階段，release 時回得去。kind 是類別（目前只有 LONG_KIND）。"""
     v.update(hold_from=v["status"], status="hold", hold_reason=reason)
+    if kind:
+        v["hold_kind"] = kind
 
 
 def sync_holds(m, batch):
@@ -178,8 +185,14 @@ def sync_holds(m, batch):
              f"更新時間：{time.strftime('%Y-%m-%d %H:%M')}。共 {len(rows)} 篇。PDF 就在這個資料夾裡。", "",
              "- 要放行：`python batch.py release " + batch + " <id>`（PDF 會移回 inbox，接著往下處理）",
              "- 不處理：留著不動即可，不會進到花錢的階段", ""]
+    rows.sort(key=lambda r: r[1].get("hold_kind") == LONG_KIND)   # 要決定的放前面，超長篇放後面
+    long_started = False
     for rid, v, md in rows:
-        lines += [f"## {v['source_pdf']}", "", f"- id：`{rid}`", f"- 原因：{v['hold_reason']}"]
+        if v.get("hold_kind") == LONG_KIND and not long_started:
+            long_started = True
+            lines += [f"# {LONG_KIND}（先不處理）", "", LONG_NOTE, ""]
+        lines += [f"## {v['source_pdf']}", "", f"- id：`{rid}`",
+                  *([f"- 類別：{v['hold_kind']}"] if v.get("hold_kind") else []), f"- 原因：{v['hold_reason']}"]
         if v.get("source_path"):
             lines.append(f"- PDF（原位，沒有搬）：`{v['source_path']}`")
         lines += [
@@ -196,7 +209,8 @@ def cmd_holds(args):
     n = sync_holds(m, args.batch)
     for rid, v in of_batch(m, args.batch).items():
         if v["status"] == "hold":
-            print(f"hold {rid}  {v['source_pdf'][:50]}\n     → {v['hold_reason']}")
+            print(f"hold {rid}  {v['source_pdf'][:50]}" + (f"  [{v['hold_kind']}]" if v.get("hold_kind") else "")
+                  + f"\n     → {v['hold_reason']}")
     print(f"共 {n} 篇，PDF 與清單在 {ROOT / 'hold' / args.batch}")
 
 
@@ -450,11 +464,15 @@ def cmd_release(args):
         if not v or v["batch"] != args.batch or v["status"] != "hold":
             print(f"略過 {rid}：不在批次 {args.batch} 或不是 hold")
             continue
+        if v.get("hold_kind") == LONG_KIND and not args.force:
+            print(f"略過 {rid}：{LONG_KIND}，{LONG_NOTE}")
+            continue
         # 放行後往下一個階段走，不再被同一道檢查擋下
         nxt = {"ingested": "ingested", "converted": "deduped", "deduped": "quality_ok"}[v["hold_from"]]
         v.setdefault("released", []).append({"reason": v.pop("hold_reason"), "at": time.strftime("%Y-%m-%d %H:%M")})
         v["status"] = nxt
         del v["hold_from"]
+        v.pop("hold_kind", None)
         print(f"放行 {rid} → {nxt}")
     save(m)
     sync_holds(m, args.batch)
@@ -490,7 +508,7 @@ def cmd_quality(args):
         stats, problems = quality_problems(text, v.get("pages"))
         v["quality"] = stats
         if problems:
-            hold(v, "轉檔品質：" + "；".join(problems))
+            hold(v, "轉檔品質：" + "；".join(problems), LONG_KIND if len(text) > MAX_CHARS else None)
             held.append(rid)
         else:
             v["status"] = "quality_ok"
@@ -547,7 +565,7 @@ def cmd_status(args):
         print(f"  {s:<11} {counts[s]}")
     for rid, v in b.items():
         if v["status"] == "hold":
-            print(f"    hold {rid}: {v['hold_reason']}")
+            print(f"    hold {rid}: " + (f"[{v['hold_kind']}] " if v.get("hold_kind") else "") + v["hold_reason"])
     ready = [v["chars_clean"] for v in b.values() if v["status"] == "cleaned"]
     if not ready:
         return
@@ -582,6 +600,7 @@ def main():
             p.set_defaults(no_copy=True)
         if name == "release":
             p.add_argument("ids", nargs="+")
+            p.add_argument("--force", action="store_true", help="超長篇也放行（照一般流程寫一張卡）")
         if name == "status":
             p.add_argument("--budget", type=float, help="這一批的預算上限（人民幣）")
     args = ap.parse_args()

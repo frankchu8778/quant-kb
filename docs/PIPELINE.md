@@ -11,7 +11,7 @@ PDF 研報在本機轉檔、清理後，交給 Kimi 寫成「每一步都附原�
 | 項目 | 數字 |
 |---|---|
 | 知識庫 | 121 張卡（batch1 97、batch2 4、poc 20） |
-| 暫緩（hold） | 4 篇，都是全文超過 12 萬字 |
+| 暫緩（hold） | 4 篇，都是「超長篇」（因子手冊），先不處理 |
 | 保留給訂閱方案 | `sub1` 60 篇，只選了檔，還沒入庫 |
 | batch1 品質 | 程式檢查第一次通過 85/97（88%）、檢查員退回 2/97、升級 0、失敗 0、埋雷 9/9 抓到 |
 | 抽樣審計 | batch1 抽 28 張；第一輪 20 張中檢查員漏抓 1 張（標籤），之後 8 張全部一致 |
@@ -126,7 +126,7 @@ python publish.py publish batch3
 | 監控警報 | 看 `run.py report` 和警報建議；決定繼續就 `bash watch.sh batch3 25 600 --ignore-alarms` |
 | watch 被關掉（關機、關 app） | 重跑同一行；已收回、已檢查的不會重複花錢 |
 | batch 很久沒動 | `python run.py status` 看；確定卡住可以取消（`kimi_batch.cancel`）再 `status` 結案、`submit` 重送 |
-| hold 的篇要放行 | `python batch.py release <id>…`，再從第 2 步接續 |
+| hold 的篇要放行 | `python batch.py release <batch> <id>…`，再從第 2 步接續；超長篇預設不放行（見下方「超長篇」） |
 | 已有卡片、只跑後半段 | `python adopt.py <batch> --cards … --fulltext …`，再 `run.py cards <batch>` |
 | 現在是 DeepSeek 尖峰 | 背景執行一律等離峰（`watch.sh` 已加 `--wait-offpeak`）；要在尖峰跑必須使用者當下同意，才加 `--allow-peak` |
 
@@ -238,6 +238,12 @@ Kimi batch 的回收時間差很多：同一天送的，有的 33 分鐘完成�
 | 品質閘 | 亂碼 ≥ 0.5%、全文 < 2000 字、每頁 < 150 字（多半是掃描版）、文字佔比 < 30%、超過 12 萬字 → hold |
 | hold 不靜默 | `hold/<batch>/待處理清單.md` 列出原因，人工放行（`batch.py release`） |
 
+**超長篇**：全文超過 12 萬字（`batch.py` 的 `MAX_CHARS`）就歸這一類，manifest 記 `hold_kind: "超長篇"`。幾乎都是因子手冊或合集，一篇列上百個因子，一張卡摘不完。目前的決定是**先不處理**：
+- 品質閘自動擋下並標類別，待處理清單把它們集中在「超長篇（先不處理）」一節。
+- `batch.py release` 預設不放行這類，要照一般流程硬寫一張卡才加 `--force`。
+- 之後做拆章節寫卡（TODO 第 23 項）時，從 manifest 撈 `hold_kind == "超長篇"` 的篇即可。
+
+
 ### 卡片的正確性
 
 | 機制 | 擋什麼 |
@@ -298,7 +304,7 @@ Kimi batch 的回收時間差很多：同一天送的，有的 33 分鐘完成�
 | 複核表不會自動產生 | 跑完要記得 `run.py review`、`audit.py review` | 待接進 `watch.sh` |
 | 程式的 batch 花費估計偏低 | 預檢已用 1.66 倍補，估計本身沒改 | 待修 |
 | 待升級沒有腳本 | 目前升級率 0，人工處理 | 量大再做 |
-| 超長手冊（> 12 萬字） | 4 篇在 hold | TODO 第 23 項 |
+| 超長篇（> 12 萬字，多為因子手冊） | 4 篇在 hold，先不處理 | TODO 第 23 項 |
 | 分流未接入 | 週報也寫完整卡，只是多花錢 | TODO |
 | 詞彙表維護 | 卡片的 `new_tag_suggestions` 沒人彙整 | TODO 第 20 項 |
 
