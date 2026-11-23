@@ -7,6 +7,8 @@ inbox/**/*.pdf
 *.lance/
 __pycache__/
 pipeline/logs/*.log
+pipeline/logs/*.out
+pipeline/logs/*.json
 pipeline/_mineru_raw/
 lab/pipeline/_mineru_test/
 # 數據（卡片、檢查結果、批次全文、manifest 與指紋）不進 git；POC 階段已提交的保留
@@ -15,6 +17,9 @@ lab/eval/trial/
 cards/batch*/
 eval/batch*/
 fulltext/batch*/
+cards/sub*/
+eval/sub*/
+fulltext/sub*/
 lab/fulltext/poc/clean-v2-standard/
 catalog/
 inbox/*/_selection.json
