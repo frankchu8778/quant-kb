@@ -248,7 +248,7 @@ python headless.py ping checker
 python run.py cards sub1 --via plan --budget 5 --limit 3 --wait-quota
 ```
 
-寫卡與檢查改用套餐，每篇每一步啟動一次 `claude -p`（不給工具、空資料夾、不存對話），程式檢查與狀態仍由 `run.py` 做。預設同時 1 篇；額度用完的篇停在 `waiting_quota`，不算失敗。`--budget` 只管 MiniMax 審計。不套用 DeepSeek 尖峰規則。設定與防跑偏的對照見 `docs/PIPELINE.md`「走火山 Agent Plan」。
+寫卡與檢查改用套餐，每篇每一步啟動一次 `claude -p`（不給工具、空資料夾、不存對話），程式檢查與狀態仍由 `run.py` 做。預設同時 2 篇，每篇的筆記和寫卡同時做；用量由程式控速（`python headless.py usage` 看估計用量）；額度用完的篇停在 `waiting_quota`，不算失敗。`--budget` 只管 MiniMax 審計。不套用 DeepSeek 尖峰規則。設定與防跑偏的對照見 `docs/PIPELINE.md`「走火山 Agent Plan」。
 
 ### 看結果
 

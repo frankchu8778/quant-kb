@@ -1126,7 +1126,7 @@ def main():
         if name in ("probe", "submit", "collect", "notes", "cards", "canary"):
             p.add_argument("--budget", type=float, help="這次執行的花費上限（人民幣）")
         if name in ("cards", "collect", "notes"):
-            p.add_argument("--workers", type=int, help="同時跑幾篇（預設：API 5、Agent Plan 1）")
+            p.add_argument("--workers", type=int, help="同時跑幾篇（預設：API 5、Agent Plan 2）")
         if name in ("cards", "collect", "notes", "canary"):
             p.add_argument("--via", choices=list(ROUTES), default="api",
                            help="api：直接打 Kimi／DeepSeek API（花錢）；plan：走火山 Agent Plan（claude -p，用套餐額度）")
@@ -1161,7 +1161,7 @@ def main():
     VIA = getattr(args, "via", "api")
     WRITER, CHECKER = ROUTES[VIA]
     if hasattr(args, "workers") and args.workers is None:
-        args.workers = 1 if VIA == "plan" else 5
+        args.workers = 2 if VIA == "plan" else 5   # Agent Plan：2026-11-24 實測同時 4 個呼叫都正常
     offpeak.allow_from_flag(getattr(args, "allow_peak", False))
     globals()[f"cmd_{args.cmd}"](args)
 
