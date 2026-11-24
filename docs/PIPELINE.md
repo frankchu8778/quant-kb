@@ -207,7 +207,7 @@ Kimi batch 的回收時間差很多：同一天送的，有的 33 分鐘完成�
 
 **筆記這一步不能省**：拿人工確認的 3 個真漏寫重新檢查，有筆記時 5/6 次判 major 退回，沒筆記 0/6。檢查員沒有自己先讀過原文，只會核對卡片上寫了的東西，看不出卡片「整段沒提」的內容。
 
-**漏掉必須涵蓋的要點，程式一律當 major**（使用者 2026-11-24 決定）：檢查員對「重要遗漏」的嚴重度在 major／minor 邊界上會跳（TODO 第 28 項；Agent Plan 對照時招商卡的「相鄰 10 天樣本剔除」被判 minor 放行）。所以檢查結果多一個 `must_capture_check`，筆記的要點逐條標 `covered`／`missing`，一個要點裡有任何一個條件沒寫到就是 `missing`，並附原文引文。`run.py` 的 `force_must_capture()` 不看檢查員給的嚴重度：`missing` 且引文逐字在原文裡的，補一條 major（`field: must_capture`、`forced_by: code`），`pass` 改成 `revise` 退回重寫；複檢還是 `missing` 就待升級給人看。引文比不到的不採用（可能是筆記本身記錯），記在 `must_capture_unverified`。檢查員原本的判定留在 `model_verdict`。舊的檢查結果沒有這個欄位，不受影響。
+**漏掉必須涵蓋的要點，程式一律當 major**（使用者 2026-11-24 決定）：檢查員對「重要遗漏」的嚴重度在 major／minor 邊界上會跳（TODO 第 28 項；Agent Plan 對照時招商卡的「相鄰 10 天樣本剔除」被判 minor 放行）。所以檢查結果多一個 `must_capture_check`，筆記的要點逐條標 `covered`／`missing`，並附原文引文。只有兩種算 `missing`：照著做需要的步驟、參數或條件，以及會讓借用者把方向理解錯的結論；佐證數字、次要理由、細節程度不算（2026-11-24 收窄：原本「任何一個條件沒寫到就算」，sub1a 的 A/B 顯示會把佐證數字也當漏寫，退回率 40–60%）。`run.py` 的 `force_must_capture()` 不看檢查員給的嚴重度：`missing` 且引文逐字在原文裡的，補一條 major（`field: must_capture`、`forced_by: code`），`pass` 改成 `revise` 退回重寫；複檢還是 `missing` 就待升級給人看。引文比不到的不採用（可能是筆記本身記錯），記在 `must_capture_unverified`。檢查員原本的判定留在 `model_verdict`。舊的檢查結果沒有這個欄位，不受影響。
 
 ## 防呆機制
 

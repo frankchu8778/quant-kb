@@ -27,8 +27,11 @@
   - 严重度：`critical`（会让借用者理解错或照着做错）/ `major`（明显不准确，但不至于误导）/ `minor`（次要）
 - `verdict`：`pass`（没有 critical 和 major）/ `revise`（有 major，没有 critical）/ `reject`（有 critical）
 - `must_capture_check`：把笔记里的 `must_capture` 逐条对照卡片，每条一项。
-  - `status`：卡片有写到就是 `covered`；没写到就是 `missing`。一个要点含多个条件（例如几个参数、几步处理）时，**任何一个条件没写到就是 `missing`**。
-  - `missing_part`：缺的是哪一部分（`covered` 时留空）。
+  - `status`：只有缺的部分属于下面两种之一，才标 `missing`；其余一律标 `covered`。
+    1. **照着做需要的步骤、参数或条件**：借用者照卡片复现时，少了它就会做出不同的东西（例如样本剔除规则、标签的计算区间、调仓频率、关键参数值）。
+    2. **会让借用者把方向理解错的结论**：例如某类因子的方向其实为负、某个做法其实无效、结论只在某个条件下成立。
+    - 佐证用的数字（斜率、占比、某个参数下的结果）、次要理由、措辞或细节程度的差异，**不算** `missing`；真的值得补，就在 `issues` 里列为 `minor`。
+  - `missing_part`：缺的是哪一部分，并说明属于上面第 1 种还是第 2 种（`covered` 时留空）。
   - `quote`、`section`：`missing` 时附原文逐字引用（10–80 字）与章节标题，证明原文确实有这一部分；`covered` 时留空。
   - 笔记的要点如果其实不是原文的主要内容、或原文并没有这样说，标 `covered` 并在 `missing_part` 写明原因，不要硬列为 `missing`。
   - 标为 `missing` 的要点，程序会一律当成 major 退回重写，不看你在 `issues` 里给的严重度。
