@@ -314,9 +314,12 @@ class Runner:
         cards, ev = self.paths(rid)
         fulltext = self.fulltext(rid)
         final, v1 = cards / f"{rid}.json", cards / f"{rid}.v1.json"
+        side, notes_job = ThreadPoolExecutor(1), None
         try:
-            # 1 寫卡
+            # 1 寫卡；檢查員筆記只看全文、不看卡片，所以和寫卡同時做（2026-11-24 起，每篇約省 2–3 分鐘）
             if not final.exists():
+                if not (ev / "notes.json").exists():
+                    notes_job = side.submit(self.notes, rid, fulltext, ev, rec)
                 card, problems = self.write_card(rid, fulltext, rec)
                 if card is None:
                     return self.finish(rid, rec, "error", "寫卡失敗")
@@ -325,7 +328,7 @@ class Runner:
                     return self.finish(rid, rec, "escalate", f"程式檢查重寫後仍有 {len(problems)} 個問題")
             card = json.loads(final.read_text())
             # 2 模型檢查
-            notes = self.notes(rid, fulltext, ev, rec)
+            notes = notes_job.result() if notes_job else self.notes(rid, fulltext, ev, rec)
             if notes is None:
                 return self.finish(rid, rec, "error", "檢查員筆記失敗")
             c1p = ev / "check1.json"
@@ -385,6 +388,12 @@ class Runner:
             rec["state"] = "interrupted"
             self.save()
             return rid, f"停下：{e}"
+        finally:
+            # 寫卡先結束（失敗、等額度、等 batch）時，等筆記做完再存一次，筆記的呼叫紀錄才不會漏記；
+            # 筆記本身會落檔，下次接續不用重做
+            side.shutdown(wait=True)
+            if notes_job is not None and rec.get("state") not in (None, "new"):
+                self.save()
 
     def check_alarms(self):
         """重算監控指標；超標就設 self.alarm，之後不再開始新的篇。回傳警報清單。"""
