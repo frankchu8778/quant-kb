@@ -28,6 +28,7 @@ agent 只負責回傳一份 JSON，不能讀寫檔、不能執行指令、看不
 用法：
   python headless.py ping writer|checker    # 送一題極小的題目，確認連線、模型名稱、回傳格式（用一點套餐額度）
   python headless.py usage                  # 估算目前各時間窗用掉的點數（不送請求）
+  python headless.py console 5h|7d|31d <點數>  # 記下火山控制台的讀數，控速改從讀數起算（控制台是固定時間重置，滾動估計會偏高）
 """
 import json
 import os
@@ -61,6 +62,10 @@ ENV_KEEP = ("PATH", "LANG", "LC_ALL", "LC_CTYPE", "TZ")
 
 # Small 檔的上限（秒數, 點數, 名稱）。週、月用滾動時間窗：滾動 7 天不超過，任何一個日曆週也不會超過；月取 31 天
 PLAN_LIMITS = [(5 * 3600, 2000, "5 小時"), (7 * 86400, 7000, "7 天"), (31 * 86400, 20000, "31 天")]
+# 控制台讀數：火山控制台的額度是固定時間重置，滾動估計會偏高；使用者看了控制台可以用
+# `python headless.py console 5h 172` 記下讀數，之後這個時間窗改用「讀數＋讀數之後的估計」，讀數滑出時間窗後回到滾動估計
+CONSOLE = PIPELINE / "logs" / "console_readings.jsonl"
+WINDOW_KEYS = {"5h": "5 小時", "7d": "7 天", "31d": "31 天"}
 PACE_SHARE = 0.8         # 估計用量最多到上限的八成，留餘地給估計誤差與專案外的使用
 # 實測（2026-11-23 三篇對照）：17 次成功呼叫共 388k token，控制台扣 76 點 ≈ 5,100 token／點。取 4,000 偏保守。
 # 之後每次到控制台看到點數，可以重算這個值（`python headless.py usage` 會印出估計值方便對照）
@@ -114,11 +119,33 @@ _pace_lock = threading.Lock()
 _inflight = {}   # 已放行、還沒回來的呼叫：id → (送出時間, 預估點數)
 
 
+def readings():
+    out = []
+    if CONSOLE.exists():
+        for line in CONSOLE.read_text().splitlines():
+            try:
+                out.append(json.loads(line))
+            except ValueError:
+                continue
+    return out
+
+
+def window_basis(rows, now, secs, name, rds=None):
+    """(讀數點數, 讀數時間或 None, 要逐筆加上的呼叫)：有還在時間窗內的控制台讀數就從讀數起算。"""
+    rds = [r for r in (readings() if rds is None else rds) if r.get("window") == name and r["at"] > now - secs]
+    if rds:
+        rd = max(rds, key=lambda r: r["at"])
+        return rd["points"], rd["at"], [r for r in rows if r[0] > rd["at"]]
+    return 0, None, [r for r in rows if r[0] > now - secs]
+
+
 def windows(rows, now):
     """各時間窗的估計用量（含還沒回來的呼叫）。"""
-    pending = list(_inflight.values())
-    return [(secs, limit, name, sum(p for ts, _, p, _ in rows if ts > now - secs) + sum(p for _, p in pending))
-            for secs, limit, name in PLAN_LIMITS]
+    pending, rds, out = list(_inflight.values()), readings(), []
+    for secs, limit, name in PLAN_LIMITS:
+        base, _, wrows = window_basis(rows, now, secs, name, rds)
+        out.append((secs, limit, name, base + sum(p for _, _, p, _ in wrows) + sum(p for _, p in pending)))
+    return out
 
 
 def reserve(role, now=None):
@@ -133,7 +160,11 @@ def reserve(role, now=None):
                 continue
             # 從最舊的開始等它們滑出時間窗，直到放得下
             until, over = now, used + need - cap
-            for ts, _, p, _ in sorted(r for r in rows if r[0] > now - secs):
+            base, rd_at, wrows = window_basis(rows, now, secs, name)
+            if rd_at is not None:   # 讀數最舊，先等它滑出時間窗
+                over -= base
+                until = rd_at + secs
+            for ts, _, p, _ in (sorted(wrows) if over > 0 else []):
                 over -= p
                 until = ts + secs
                 if over <= 0:
@@ -312,12 +343,20 @@ def cmd_usage():
     rows, now = ledger(), time.time()
     print(f"估計值：{TOKENS_PER_POINT} token／點；控速到上限的 {PACE_SHARE:.0%}；專案外的用量算不到")
     for secs, limit, name, used in windows(rows, now):
-        print(f"  最近 {name}：約 {used:.0f} 點／上限 {limit}（控速線 {limit * PACE_SHARE:.0f}）")
+        base, rd_at, _ = window_basis(rows, now, secs, name)
+        src = f"；從控制台讀數 {base:.0f} 點（{time.strftime('%m-%d %H:%M', time.localtime(rd_at))}）起算" if rd_at else ""
+        print(f"  最近 {name}：約 {used:.0f} 點／上限 {limit}（控速線 {limit * PACE_SHARE:.0f}）{src}")
     print(f"  下一次估計：寫卡 {next_cost('writer', rows):.0f} 點、檢查 {next_cost('checker', rows):.0f} 點")
 
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["usage"]:
+        cmd_usage()
+    elif len(sys.argv) == 4 and sys.argv[1] == "console" and sys.argv[2] in WINDOW_KEYS:
+        CONSOLE.parent.mkdir(parents=True, exist_ok=True)
+        with CONSOLE.open("a") as f:
+            f.write(json.dumps({"window": WINDOW_KEYS[sys.argv[2]], "points": float(sys.argv[3]), "at": time.time()},
+                               ensure_ascii=False) + "\n")
         cmd_usage()
     elif len(sys.argv) == 3 and sys.argv[1] == "ping" and sys.argv[2] in ROLES:
         cmd_ping(sys.argv[2])
