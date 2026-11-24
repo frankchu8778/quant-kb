@@ -2,6 +2,7 @@
 
 用法：
   python publish.py reviews <batch>     # 讀填好的複核表與審計結果，寫回 manifest（不送 API）
+  python publish.py accept <batch> <id> [<id> ...]   # 使用者同意：待升級的卡帶著已知問題發布
   python publish.py publish <batch>     # 渲染卡片、複製全文、重建 kb/catalog.jsonl 與 kb/CLAUDE.md
 
 人工判定的處理（只看「真」；誤報、吹毛求疵只記錄）：
@@ -9,6 +10,10 @@
   - 其餘「真」= 仍在卡上的已知問題：critical 不發布；major / minor 發布，卡片最後加「已知问题」一節，
     frontmatter 的 known_issues 記條數，讓檢索時看得到
 複核表是人工填寫的唯一來源；重新填或改判之後再跑一次 `reviews` 即可。
+
+待升級（重寫後複檢仍不過）的卡預設不發布。使用者看過、同意帶著已知問題發布的，用 `accept` 登記（2026-11-24 起）：
+  - 已知問題＝最後一次檢查（對目前這版卡片）判的 critical／major；複核表把同一條判成誤報或吹毛求疵的不列
+  - 有 critical 的不能 accept；更早版本卡片的複核條目不再適用（卡片已改過）
 """
 import argparse
 import json
@@ -155,6 +160,40 @@ def tag(vocab_part, k):
     return f"{k}/{vocab_part.get(k, {}).get('zh', '')}"
 
 
+def known_issues(v):
+    """發布時要列在卡片最後的已知問題。"""
+    acc = (v.get("card") or {}).get("accepted")
+    items = (v.get("review") or {}).get("items", [])
+    if not acc:
+        return [i for i in items if i.get("open")]
+    dismissed = {(i["stage"], i["field"], i["type"]) for i in items if i["verdict"] in ("誤報", "吹毛求疵")}
+    return [i for i in acc["known"] if (acc["check"], i["field"], i["type"]) not in dismissed]
+
+
+def cmd_accept(args):
+    with catalog_lock():
+        m = B.load()
+        for rid in args.ids:
+            v = m.get(rid)
+            rec = (v or {}).get("card") or {}
+            if not v or v["batch"] != args.batch or rec.get("state") != "escalate":
+                print(f"略過 {rid}：不在批次 {args.batch} 或不是待升級")
+                continue
+            ev = B.ROOT / "eval" / args.batch / rid
+            stage = "check2" if (ev / "check2.json").exists() else "check1"
+            res = json.loads((ev / f"{stage}.json").read_text())
+            serious = [i for i in res["issues"] if i["severity"] != "minor"]
+            if any(i["severity"] == "critical" for i in serious):
+                print(f"略過 {rid}：最後一次檢查有 critical，不能帶著已知問題發布")
+                continue
+            rec["accepted"] = {"at": time.strftime("%Y-%m-%d %H:%M"), "by": "使用者", "check": stage,
+                               "known": [{"stage": stage, "source": "檢查員（待升級，使用者同意帶著已知問題發布）",
+                                          **{k: i.get(k, "") for k in ("severity", "type", "field", "source_says",
+                                                                       "quote", "section")}} for i in serious]}
+            print(f"登記 {rid}：帶 {len(serious)} 個已知問題發布（{stage}）")
+        B.save(m)
+
+
 def render(rid, v, c, vocab, st):
     fams, meths = vocab["families"], vocab["methods"]
     keywords = []
@@ -163,7 +202,7 @@ def render(rid, v, c, vocab, st):
     for f in c["families"]:
         keywords += [fams.get(f, {}).get("zh", f), *map(str, fams.get(f, {}).get("aliases", []))]
     keywords += c.get("new_tag_suggestions") or []
-    known = [i for i in (v.get("review") or {}).get("items", []) if i.get("open")]
+    known = known_issues(v)
     audit = v.get("audit")
     fm = {
         "id": rid, "title": c["title"], "broker": c["broker"], "date": c["date"], "series": c["series"],
@@ -176,14 +215,15 @@ def render(rid, v, c, vocab, st):
         "keywords": list(dict.fromkeys(keywords)),
         "fulltext": f"fulltext/{rid}.md",
         "source_pdf": v["source_pdf"],
-        "checked": "revised" if (v.get("card") or {}).get("revised") else "pass",
+        "checked": ("escalated-accepted" if (v.get("card") or {}).get("accepted")
+                    else "revised" if (v.get("card") or {}).get("revised") else "pass"),
         "audited": (audit or {}).get("verdict"),
         "known_issues": len(known),
     }
     out = ["---", yaml.safe_dump(fm, allow_unicode=True, sort_keys=False, width=1000).strip(), "---", "",
            f"# {c['title']}", "", f"{c['broker']}｜{c['date']}｜{c['series'] or '非系列'}｜{c['report_type']}", ""]
     if known:
-        out += ["> **注意：本卡有人工复核确认的问题，见文末「已知问题」。**", ""]
+        out += ["> **注意：本卡有已知问题（人工复核确认，或检查员指出、使用者同意带着发布），见文末「已知问题」。**", ""]
     out += ["## 摘要", "", c["summary"], "", "## 核心思路", "", c["core_idea"], "", "## 方法步骤", ""]
     for n, s in enumerate(c["method_steps"], 1):
         out += [f"{n}. {s['step']}", f"   - 原文（{s['section']}）：「{s['quote']}」"]
@@ -209,7 +249,7 @@ def render(rid, v, c, vocab, st):
     if c["evidence_quotes"]:
         out += ["## 其他原文依据", ""] + [f"- {q['claim']}：「{q['quote']}」" for q in c["evidence_quotes"]] + [""]
     if known:
-        out += ["## 已知问题", "", "人工对照原文确认、卡片尚未修正的问题。使用这张卡时以原文为准。", ""]
+        out += ["## 已知问题", "", "卡片尚未修正的问题（人工对照原文确认，或检查员指出、使用者同意带着发布）。使用这张卡时以原文为准。", ""]
         out += [f"- **{i['severity']} / {i['type']}**（`{i['field']}`）：{i['source_says']}"
                 + (f"（复核备注：{i['note']}）" if i.get("note") else "") for i in known] + [""]
     return "\n".join(out), fm
@@ -245,8 +285,8 @@ def cmd_publish(args):
         if v["batch"] != args.batch:
             continue
         state = (v.get("card") or {}).get("state")
-        known = [i for i in (v.get("review") or {}).get("items", []) if i.get("open")]
-        if state != "passed":
+        known = known_issues(v)
+        if state != "passed" and not (state == "escalate" and v["card"].get("accepted")):
             skipped.append((rid, {None: "還沒寫卡", "escalate": "待升級", "error": "寫卡失敗"}.get(state, f"狀態 {state}")
                                  if v["status"] != "hold" else "hold（暫緩處理）"))
         elif any(i["severity"] == "critical" for i in known):
@@ -278,7 +318,7 @@ def cmd_publish(args):
     (KB_OUT / "VOCAB.md").write_text(vocab_md(vocab, st, catalog))
     shutil.copy(PIPELINE / "kb_CLAUDE.md", KB_OUT / "CLAUDE.md")
     print(f"{args.batch}：發布 {len(done)} 張（其中帶已知問題 "
-          f"{sum(1 for r in done if (m[r].get('review') or {}).get('items') and any(i.get('open') for i in m[r]['review']['items']))} 張）"
+          f"{sum(1 for r in done if known_issues(m[r]))} 張）"
           f"；沒發布 {len(skipped)} 篇；知識庫共 {len(catalog)} 張 → {KB_OUT}")
     from collections import Counter
     for why, n in Counter(w for _, w in skipped).items():
@@ -288,10 +328,13 @@ def cmd_publish(args):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("reviews", "publish"):
-        sub.add_parser(name).add_argument("batch")
+    for name in ("reviews", "publish", "accept"):
+        sp = sub.add_parser(name)
+        sp.add_argument("batch")
+        if name == "accept":
+            sp.add_argument("ids", nargs="+")
     args = ap.parse_args()
-    {"reviews": cmd_reviews, "publish": cmd_publish}[args.cmd](args)
+    {"reviews": cmd_reviews, "publish": cmd_publish, "accept": cmd_accept}[args.cmd](args)
 
 
 if __name__ == "__main__":
