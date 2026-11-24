@@ -44,6 +44,9 @@ ROOT = Path(os.environ.get("QUANT_KB_ROOT", KB))
 MANIFEST = ROOT / "catalog" / "manifest.json"
 MINERU = "/home/newt/venvs/kb-parse/bin/mineru-kit"
 IMG_RE = re.compile(r"!\[([^\]]*)\]\(data:image/([a-z]+);base64,([^)]*)\)")
+# MinerU 有時把圖放在 HTML 表格裡，寫成 <img src="data:image/...;base64,...">（sub1 另類交易策略系列之十一：
+# 95 萬字裡 93 萬字是這種圖片編碼，2026-11-24 發現），也要抽成檔案
+HTML_IMG_RE = re.compile(r'<img\s+[^>]*?src="data:image/([a-z]+);base64,([^"]*)"[^>]*>')
 GARBLED = re.compile(r"[�\u0000-\u0008\u000b\u000c\u000e-\u001f-]")
 CJK = re.compile(r"[一-鿿]")
 NAME_RE = re.compile(r"(\d{8})-([^-]+)-(.*)")
@@ -356,16 +359,18 @@ def postprocess(rid, raw_md, out_dir):
     text, n = raw_md.read_text(), 0
     img_dir = out_dir / "images" / rid
 
-    def keep(mt):
+    def save_img(alt, kind, data):
         nonlocal n
         n += 1
-        ext = "jpg" if mt.group(2) == "jpeg" else mt.group(2)
+        ext = "jpg" if kind == "jpeg" else kind
         img_dir.mkdir(parents=True, exist_ok=True)
         name = f"img_{n:02d}.{ext}"
-        (img_dir / name).write_bytes(base64.b64decode(mt.group(3)))
-        return f"![{mt.group(1)}](images/{rid}/{name})"
+        (img_dir / name).write_bytes(base64.b64decode(data))
+        return f"![{alt}](images/{rid}/{name})"
 
-    text = unicodedata.normalize("NFKC", IMG_RE.sub(keep, text))
+    text = IMG_RE.sub(lambda mt: save_img(mt.group(1), mt.group(2), mt.group(3)), text)
+    text = HTML_IMG_RE.sub(lambda mt: save_img("", mt.group(1), mt.group(2)), text)
+    text = unicodedata.normalize("NFKC", text)
     (out_dir / f"{rid}.md").write_text(text)
     return len(text), n
 
