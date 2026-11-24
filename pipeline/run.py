@@ -1059,34 +1059,64 @@ def review_items(args):
             for p in sorted(d.glob("*/check[12].json"))]
 
 
+REVIEW_SAMPLE = 5   # 每次複核表從「不是必看、還沒判過」的卡裡隨機抽幾張
+
+
 def cmd_review(args):
+    """產生複核表。每條標「要不要看」：待升級的卡、引文找不到的是必看；其餘沒判過的卡隨機抽 REVIEW_SAMPLE 張；
+    剩下的可略過（使用者 2026-11-24 定：檢查員已複核 25 條 0 誤報，改抽查）。"""
+    import random
+    import publish
     from validate import _norm, quote_found
-    out = ["# 檢查員判的 critical / major：人工複核表", "",
-           "每一條對照原文判斷：**真**（卡片確實錯）、**誤報**（卡片沒錯）、**吹毛求疵**（不算錯但可改）。",
-           "「引文」是檢查員自己附的原文證據；「引文在全文」是程式比對的結果，找不到的優先懷疑是誤報。", ""]
-    n = 0
+    head = ["# 檢查員判的 critical / major：人工複核表", "",
+            "每一條對照原文判斷：**真**（卡片確實錯）、**誤報**（卡片沒錯）、**吹毛求疵**（不算錯但可改）。",
+            "「引文」是檢查員自己附的原文證據；「引文在全文」是程式比對的結果，找不到的優先懷疑是誤報。",
+            f"「要不要看」：**必看**＝待升級的卡或引文找不到；**抽查**＝隨機抽的 {REVIEW_SAMPLE} 張；可略過的不用判。"
+            "看不懂的留白即可。", ""]
+    states = {} if args.trial else {k: v.get("card", {}).get("state") for k, v in B.load().items()}
+    items = []
     for label, p, ftp in review_items(args):
         res = json.loads(p.read_text())
         ft = _norm(ftp.read_text())
+        rid = label.split(" / ")[0]
         for i in res["issues"]:
-            if i["severity"] == "minor":
-                continue
-            n += 1
-            out += [f"## {n}. {label}", "",
-                    f"- 嚴重度 / 類型：**{i['severity']}** / {i['type']}（整張卡判 {res['verdict']}）",
-                    f"- 欄位：`{i['field']}`",
-                    f"- 卡片寫：{i['card_says']}",
-                    f"- 檢查員說原文是：{i['source_says']}",
-                    f"- 引文：「{i['quote']}」（{i['section']}）",
-                    f"- 引文在全文：{'找得到' if quote_found(i['quote'], ft) else '**找不到**'}",
-                    "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""]
+            if i["severity"] != "minor":
+                items.append((rid, label, res, i, quote_found(i["quote"], ft)))
     dest = (T.LAB / "pipeline" if args.trial else PIPELINE) / "results" / f"major_review_{'trial' if args.trial else args.batch}.md"
-    if n == 0 and not dest.exists():   # 沒有要複核的就不產生空檔
+    if not items and not dest.exists():   # 沒有要複核的就不產生空檔
         print(f"0 條，不產生 {dest.name}")
         return
-    import publish
-    dest.write_text(publish.keep_judgments(dest, "\n".join(out)))
-    print(f"{n} 條 → {dest}")
+    blocks = []
+    for n, (rid, label, res, i, found) in enumerate(items, 1):
+        blocks.append([f"## {n}. {label}", "",
+                       f"- 嚴重度 / 類型：**{i['severity']}** / {i['type']}（整張卡判 {res['verdict']}）",
+                       f"- 欄位：`{i['field']}`",
+                       f"- 卡片寫：{i['card_says']}",
+                       f"- 檢查員說原文是：{i['source_says']}",
+                       f"- 引文：「{i['quote']}」（{i['section']}）",
+                       f"- 引文在全文：{'找得到' if found else '**找不到**'}",
+                       "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""])
+    judged = set()
+    if dest.exists():
+        for b in __import__("re").split(r"\n(?=## \d+\. )", dest.read_text())[1:]:
+            m = publish.JUDGE_RE.search(b)
+            if m and "＿＿（" not in m.group(0):
+                judged.add(publish._block_key(b))
+    is_judged = [publish._block_key("\n".join(b)) in judged for b in blocks]
+    must = {rid for rid, *_ , found in items if states.get(rid) == "escalate"} | \
+           {rid for rid, *_ , found in items if not found}
+    rest = sorted({it[0] for it, j in zip(items, is_judged) if not j and it[0] not in must})
+    pick = set(random.Random(args.batch or "trial").sample(rest, min(REVIEW_SAMPLE, len(rest))))
+    for b, (rid, *_ , found), j in zip(blocks, items, is_judged):
+        why = ("已判過" if j else
+               "**必看**（待升級）" if states.get(rid) == "escalate" else
+               "**必看**（引文找不到）" if not found else
+               "抽查" if rid in pick else "可略過")
+        b.insert(2, f"- 要不要看：{why}")
+    text = "\n".join(head + [line for b in blocks for line in b])
+    dest.write_text(publish.keep_judgments(dest, text))
+    cnt = lambda w: sum(w in b[2] for b in blocks)
+    print(f"{len(items)} 條 → {dest}：必看 {cnt('必看')}、抽查 {cnt('抽查')}、可略過 {cnt('可略過')}、已判過 {cnt('已判過')}")
 
 
 # ---- 分流規則：只看檔名能不能認出週報類 ----
