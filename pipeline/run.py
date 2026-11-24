@@ -1096,19 +1096,35 @@ def cmd_review(args):
                        f"- 引文：「{i['quote']}」（{i['section']}）",
                        f"- 引文在全文：{'找得到' if found else '**找不到**'}",
                        "- 人工判定：＿＿（真 / 誤報 / 吹毛求疵）", ""])
-    judged = set()
+    judged, old_mark = set(), {}
     if dest.exists():
         for b in __import__("re").split(r"\n(?=## \d+\. )", dest.read_text())[1:]:
             m = publish.JUDGE_RE.search(b)
             if m and "＿＿（" not in m.group(0):
                 judged.add(publish._block_key(b))
-    is_judged = [publish._block_key("\n".join(b)) in judged for b in blocks]
+            mk = __import__("re").search(r"^- 要不要看：(.+)$", b, __import__("re").M)
+            if mk:
+                old_mark[publish._block_key(b)] = mk.group(1)
+    keys = [publish._block_key("\n".join(b)) for b in blocks]
+    is_judged = [k in judged for k in keys]
     must = {rid for rid, *_ , found in items if states.get(rid) == "escalate"} | \
            {rid for rid, *_ , found in items if not found}
-    rest = sorted({it[0] for it, j in zip(items, is_judged) if not j and it[0] not in must})
+    # 舊表已經標過的（抽查／可略過）照舊，只在新出現的條目裡抽，重產生時不會越抽越多
+    rest = sorted({it[0] for it, j, k in zip(items, is_judged, keys) if not j and it[0] not in must and k not in old_mark})
     pick = set(random.Random(args.batch or "trial").sample(rest, min(REVIEW_SAMPLE, len(rest))))
-    for b, (rid, *_ , found), j in zip(blocks, items, is_judged):
+    first = {}   # 同一次檢查、同一段引文：檢查員常在欄位和 must_capture 各報一次，後一條算重複
+    dup = []
+    for n, (rid, label, res, i, found) in enumerate(items, 1):
+        key = (label, _norm(i["quote"]))
+        dup.append(first.get(key) if i["quote"].strip() else None)
+        first.setdefault(key, n)
+    for b, (rid, *_ , found), j, d, k in zip(blocks, items, is_judged, dup, keys):
+        prev = old_mark.get(k, "")
         why = ("已判過" if j else
+               f"可略過（與 #{d} 同一處）" if d else
+               "**必看**（待升級）" if states.get(rid) == "escalate" else
+               "**必看**（引文找不到）" if not found else
+               prev if prev in ("抽查", "可略過") else
                "**必看**（待升級）" if states.get(rid) == "escalate" else
                "**必看**（引文找不到）" if not found else
                "抽查" if rid in pick else "可略過")
