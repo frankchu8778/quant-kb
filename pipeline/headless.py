@@ -65,6 +65,7 @@ PLAN_LIMITS = [(5 * 3600, 2000, "5 小時"), (7 * 86400, 7000, "7 天"), (31 * 8
 # 控制台讀數：火山控制台的額度是固定時間重置，滾動估計會偏高；使用者看了控制台可以用
 # `python headless.py console 5h 172` 記下讀數，之後這個時間窗改用「讀數＋讀數之後的估計」，讀數滑出時間窗後回到滾動估計
 CONSOLE = PIPELINE / "logs" / "console_readings.jsonl"
+RECHECK = 900   # 控速等待最多幾秒就重算一次
 WINDOW_KEYS = {"5h": "5 小時", "7d": "7 天", "31d": "31 天"}
 PACE_SHARE = 0.8         # 估計用量最多到上限的八成，留餘地給估計誤差與專案外的使用
 # 實測（2026-11-23 三篇對照）：17 次成功呼叫共 388k token，控制台扣 76 點 ≈ 5,100 token／點。取 4,000 偏保守。
@@ -171,6 +172,8 @@ def reserve(role, now=None):
                     break
             if over > 0:   # 只剩還沒回來的呼叫：等一輪再看
                 until = now + 600
+            # 最多等 RECHECK 秒就重算（只在本機算，不用額度）：中途記了新的控制台讀數才會馬上生效
+            until = min(until, now + RECHECK)
             raise PaceWait(f"控速：最近 {name} 估計已用 {used:.0f} 點，這次估 {need:.0f} 點，會超過上限 {limit} 的 "
                            f"{PACE_SHARE:.0%}（{cap:.0f}）；{time.strftime('%m-%d %H:%M', time.localtime(until))} 後再送", until)
         rid = object()
