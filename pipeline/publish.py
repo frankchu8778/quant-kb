@@ -51,6 +51,10 @@ def parse_review(path, source):
         j = re.search(r"人工判定：(.*?)（真 / 誤報 / 吹毛求疵）", block)
         raw = (j.group(1) if j else "").replace("＿", " ").replace("*", "").strip()
         verdict = next((v for v in VERDICTS if raw.startswith(v)), None)   # 只認開頭；開頭認不出就當沒填，請人確認
+        if verdict is None and re.match(r"部分(?:真|成立)", raw):   # 「部分真」：卡片確實有錯的部分，當真處理
+            verdict = "真"
+            raw = "真，" + raw
+        skip = bool(re.search(r"要不要看：可略過", block))   # 抽查制下標「可略過」的，沒填不算漏
         severity = sev.group(1) if sev else None
         regrade = re.search(r"(?:降為|降为|改為|改为|升為|升为)\s*(critical|major|minor)", raw)   # 說明裡寫「降為 minor」就照人工改嚴重度
         if verdict == "真" and regrade:
@@ -59,7 +63,7 @@ def parse_review(path, source):
                       "severity": severity, "type": sev.group(2).strip() if sev else None,
                       "field": field.group(1) if field else None, "verdict": verdict,
                       "note": raw[len(verdict):].strip(" ，,：:") if verdict else raw,
-                      "source_says": says.group(1).strip() if says else ""})
+                      "source_says": says.group(1).strip() if says else "", "skip": skip})
     return items
 
 
@@ -149,7 +153,10 @@ def cmd_reviews(args):
             print(f"  仍在卡上：{i['rid']}  {i['severity']} {i['type']}  `{i['field']}`")
         elif i.get("resolved"):
             print(f"  已由重寫處理：{i['rid']}  {i['severity']} {i['type']}")
-    for i in blank:
+    skipped = [i for i in blank if i.get("skip")]
+    if skipped:
+        print(f"  標「可略過」沒填的 {len(skipped)} 條不用判")
+    for i in (i for i in blank if not i.get("skip")):
         print(f"  還沒填或看不懂（判定要以 真／誤報／吹毛求疵 開頭）：{i['source']}" + (f"「{i['note'][:30]}」" if i["note"] else ""))
     if unknown:
         print(f"  manifest 裡沒有這些篇（可能是試產的卡，略過）：{unknown}")
