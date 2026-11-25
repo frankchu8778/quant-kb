@@ -367,6 +367,20 @@ def cmd_publish(args):
     from collections import Counter
     for why, n in Counter(w for _, w in skipped).items():
         print(f"  沒發布：{why} × {n}")
+    update_search_index()
+
+
+def update_search_index():
+    """kb-search 的向量索引（kb/index/）跟著發布更新；只算新卡或內容變了的卡。查詢服務會自己重載。"""
+    import os
+    import subprocess
+    py = Path(os.environ.get("KB_SEARCH_PYTHON", Path.home() / "venvs" / "kb-parse" / "bin" / "python"))
+    if not py.exists():
+        print(f"  ⚠ 沒更新查詢索引：找不到 {py}（設 KB_SEARCH_PYTHON，或之後手動跑 kb-search index）")
+        return
+    r = subprocess.run([str(py), str(PIPELINE / "kbsearch.py"), "index"], capture_output=True, text=True)
+    out = [l for l in (r.stdout + r.stderr).splitlines() if "索引" in l or "向量" in l or "Error" in l]
+    print("  查詢索引：" + ("；".join(out) if r.returncode == 0 else f"更新失敗（{r.returncode}）\n" + r.stderr[-800:]))
 
 
 def main():

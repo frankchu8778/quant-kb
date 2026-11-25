@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# 知識庫查詢工具的捷徑：用 kb-parse venv 跑 pipeline/kbsearch.py（說明見該檔開頭）
+exec "${KB_SEARCH_PYTHON:-$HOME/venvs/kb-parse/bin/python}" "$(dirname "$(readlink -f "$0")")/../kbsearch.py" "$@"

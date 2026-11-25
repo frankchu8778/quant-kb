@@ -35,3 +35,5 @@ lab/eval/_kimi_batch_probe/
 pipeline/agent_plan/.config/
 pipeline/logs/*.jsonl
 pipeline/experiments/_cache/
+# 策略開發筆記（quant-kb skill 寫的，屬於研究資料）
+/workspace/
