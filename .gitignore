@@ -33,3 +33,4 @@ lab/eval/_stability/
 lab/eval/_kimi_batch_probe/
 # Agent Plan 路線的 Claude Code 設定資料夾（headless.py）
 pipeline/agent_plan/.config/
+pipeline/logs/*.jsonl
