@@ -20,6 +20,7 @@ import json
 import re
 import shutil
 import time
+from pathlib import Path
 
 import yaml
 
@@ -201,6 +202,30 @@ def cmd_accept(args):
         B.save(m)
 
 
+FREQ_ZH = {"high-frequency": ("高频", "秒级、tick 级"), "intraday": ("日内", "日内开平仓，不隔夜"),
+           "daily": ("日频", "每天调仓或持有一天以上"), "weekly-or-longer": ("周频及以上", "周频、月频及更长"),
+           "unspecified": ("未说明", "原文没写清楚调仓或持仓频率")}   # 與 judge/strategy_types.yaml 的 frequency 一致
+
+
+_report_root = None
+
+
+def source_folder(v):
+    """原文 PDF 在研報資料夾（.env 的 Research_Report_PATH）裡的子資料夾；舊批次沒記原始路徑就是 None。"""
+    global _report_root
+    if not v.get("source_path"):
+        return None
+    if _report_root is None:
+        from common import load_env
+        env = {k.strip(): x.strip() for k, x in load_env().items()}
+        _report_root = Path(env["Research_Report_PATH"]) if env.get("Research_Report_PATH") else False
+    parent = Path(v["source_path"]).parent
+    if _report_root and parent.is_relative_to(_report_root):
+        rel = parent.relative_to(_report_root).as_posix()
+        return rel if rel != "." else ""
+    return None
+
+
 def render(rid, v, c, vocab, st):
     fams, meths = vocab["families"], vocab["methods"]
     keywords = []
@@ -222,13 +247,16 @@ def render(rid, v, c, vocab, st):
         "keywords": list(dict.fromkeys(keywords)),
         "fulltext": f"fulltext/{rid}.md",
         "source_pdf": v["source_pdf"],
+        "source_folder": source_folder(v),
         "checked": ("escalated-accepted" if (v.get("card") or {}).get("accepted")
                     else "revised" if (v.get("card") or {}).get("revised") else "pass"),
         "audited": (audit or {}).get("verdict"),
         "known_issues": len(known),
     }
     out = ["---", yaml.safe_dump(fm, allow_unicode=True, sort_keys=False, width=1000).strip(), "---", "",
-           f"# {c['title']}", "", f"{c['broker']}｜{c['date']}｜{c['series'] or '非系列'}｜{c['report_type']}", ""]
+           f"# {c['title']}", "", f"{c['broker']}｜{c['date']}｜{c['series'] or '非系列'}｜{c['report_type']}", "",
+           f"原文文件：`{v['source_pdf']}`" + (f"（研报文件夹下 `{fm['source_folder']}/`）" if fm["source_folder"]
+                                              else "（研报文件夹根目录）" if fm["source_folder"] == "" else ""), ""]
     if known:
         out += ["> **注意：本卡有已知问题（人工复核确认，或检查员指出、使用者同意带着发布），见文末「已知问题」。**", ""]
     out += ["## 摘要", "", c["summary"], "", "## 核心思路", "", c["core_idea"], "", "## 方法步骤", ""]
@@ -274,6 +302,11 @@ def vocab_md(vocab, st, catalog):
     out += [f"| {k} | {v['zh']} | {v.get('definition', '')} | {cnt[k]} |" for k, v in st.items()]
     out += ["", "## 方法家族（families）", "", "| id | 中文 | 别名 | 卡片数 |", "|---|---|---|---|"]
     out += [f"| {k} | {v['zh']} | {'、'.join(map(str, v.get('aliases', [])))} | {cnt[k]} |" for k, v in vocab["families"].items()]
+    fcnt = Counter(c.get("frequency") for c in catalog)
+    out += ["", "## 频率（frequency）", "", "每张卡一个值，在 `catalog.jsonl` 或卡片 frontmatter 的 `frequency` 字段（没有「英文 id/中文名」写法，"
+            "grep 用英文 id，例如 `\"frequency\": \"intraday\"`）。问日内、高频策略先用这个字段筛。", "",
+            "| id | 中文 | 定义 | 卡片数 |", "|---|---|---|---|"]
+    out += [f"| {k} | {zh} | {d} | {fcnt[k]} |" for k, (zh, d) in FREQ_ZH.items()]
     out += ["", "## 方法（methods）", "", "| id | 中文 | 别名 | 家族 | 卡片数 |", "|---|---|---|---|---|"]
     out += [f"| {k} | {v['zh']} | {'、'.join(map(str, v.get('aliases', [])))} | {v.get('family', '')} | {cnt[k]} |"
             for k, v in vocab["methods"].items()]
@@ -282,7 +315,10 @@ def vocab_md(vocab, st, catalog):
 
 def cmd_publish(args):
     vocab = load_vocab()
-    st = yaml.safe_load((PIPELINE / "judge" / "strategy_types.yaml").read_text())["strategy_types"]
+    judge = yaml.safe_load((PIPELINE / "judge" / "strategy_types.yaml").read_text())
+    st = judge["strategy_types"]
+    if set(judge["frequency"]) != set(FREQ_ZH):
+        raise SystemExit(f"publish.py 的 FREQ_ZH 和 strategy_types.yaml 的 frequency 不一致：{judge['frequency']}")
     m = B.load()
     cards_dir, ft_dir = KB_OUT / "cards", KB_OUT / "fulltext"
     cards_dir.mkdir(parents=True, exist_ok=True)
@@ -320,7 +356,8 @@ def cmd_publish(args):
         fm = yaml.safe_load(p.read_text().split("---", 2)[1])
         catalog.append({k: fm[k] for k in ("id", "title", "broker", "date", "series", "report_type",
                                            "primary_strategy_type", "strategy_types", "asset_class", "frequency",
-                                           "families", "methods", "known_issues")})
+                                           "families", "methods", "known_issues")} |
+                       {k: fm.get(k) for k in ("source_pdf", "source_folder")})
     (KB_OUT / "catalog.jsonl").write_text("".join(json.dumps(c, ensure_ascii=False) + "\n" for c in catalog))
     (KB_OUT / "VOCAB.md").write_text(vocab_md(vocab, st, catalog))
     shutil.copy(PIPELINE / "kb_CLAUDE.md", KB_OUT / "CLAUDE.md")

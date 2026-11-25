@@ -4,7 +4,7 @@
 
 ## 结构
 
-- `catalog.jsonl`：一行一篇（id、标题、券商、日期、系列、report_type、primary_strategy_type、strategy_types、asset_class、frequency、families、methods、known_issues），用来快速筛选
+- `catalog.jsonl`：一行一篇（id、标题、券商、日期、系列、report_type、primary_strategy_type、strategy_types、asset_class、frequency、families、methods、known_issues、source_pdf、source_folder），用来快速筛选；`source_pdf` 是原文 PDF 文件名、`source_folder` 是它在研报文件夹里的子文件夹（旧卡为 null）
 - `cards/<id>.md`：研报卡片。frontmatter 有上面这些字段，加上 `keywords`（标签的中英同义词与卡片建议的新标签）、`fulltext`（全文路径）、`checked`、`audited`、`known_issues`。正文依次是摘要、核心思路、方法步骤（每步附原文引文与章节）、核心公式、关键结果（附原文依据）、市场条件（较新的卡才有）、局限、复现缺口、所需数据
 - `fulltext/<id>.md`：研报全文（PDF 转换，表格是 HTML，可能有少量公式识别噪声）
 
@@ -44,4 +44,4 @@
 3. 逐张读候选卡片，判断是否相关。
 4. 需要公式、参数、实证细节时，先 grep 定位，再只读 `fulltext` 中的相关段落。
 
-完成标准：每个候选都判定过相关或不相关；回答中的每个结论都标注来源卡片 id，引用的数字以全文为准。
+完成标准：每个候选都判定过相关或不相关；回答中的每个结论都标注来源卡片 id，引用的数字以全文为准。回答末尾列出引用卡片的研报标题与原文文件名（`source_pdf`，原样照抄），方便使用者找原文。
