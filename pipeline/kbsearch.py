@@ -117,8 +117,7 @@ def brief(c):
             f"{c['primary_strategy_type'].split('/')[1]}" + (f"（另 {'、'.join(others)}）" if others else "")
             + f"｜{'、'.join(c['asset_class'])}",
             f"方法：{'、'.join(t.split('/')[1] for t in c['methods'])}",
-            f"原文：`{c.get('source_pdf')}`" + (f"（{c['source_folder']}/）" if c.get("source_folder")
-                                             else "（根目录）" if c.get("source_folder") == "" else "（子文件夹未记录）")]
+            f"原文：`{c.get('source_pdf')}`"]
     body = [f"摘要：{clip(sec.get('摘要', ''), 220)}", f"核心思路：{clip(sec.get('核心思路', ''), 160)}"]
     st = steps(sec)
     if st:
