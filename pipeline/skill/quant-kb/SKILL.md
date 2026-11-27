@@ -5,13 +5,15 @@ description: 查询量化研报知识库（券商研报的方法卡片与全文�
 
 # 量化研报知识库
 
-知识库在 `/home/newt/quant-kb/kb/`，只读：由 quant-kb 项目的 `pipeline/publish.py` 生成。卡片与全文都是**简体中文**。
+知识库只读：由 quant-kb 项目的 `pipeline/publish.py` 生成。卡片与全文都是**简体中文**。
+
+**路径不写死**：要知道知识库（`kb`）、标签表（`vocab`）、策略笔记目录（`workspace`）在哪，跑 `kb-search paths`。下文的 `<kb>`、`<workspace>` 指它印出的路径。
 
 **省 token 是这份 skill 的核心要求**：不要自己 grep 或逐张读卡。一律先用 `kb-search` 在本机排序（不花 token），再按层往下读，够了就停。整张卡约 7,000 字，精简卡约 1,000 字，清单一行约 100 字。
 
 ## 工具：`kb-search`
 
-装在 `~/.local/bin/kb-search`（源文件 `/home/newt/quant-kb/pipeline/kbsearch.py`）。
+在 PATH 上（一般是 `~/.local/bin/kb-search`，指向项目的 `pipeline/bin/kb-search`）。
 
 | 命令 | 作用 | 大约字数 |
 |---|---|---|
@@ -24,11 +26,11 @@ description: 查询量化研报知识库（券商研报的方法卡片与全文�
 
 - id 可以只打最后 6 码。问题用简体或繁体都行；把问题用自己的话写完整，可以加同义词或英文（例如「开盘区间突破 opening range breakout」），不用写正则。
 - 第一次 search 要等约 15 秒启动本机服务，之后不到 1 秒。周报点评一律不列。
-- 筛选值：频率 `high-frequency`、`intraday`、`daily`、`weekly-or-longer`、`unspecified`；策略大类、方法家族、方法的 id 见 `kb/VOCAB.md`（只在要用筛选、又不确定 id 时才读）。
+- 筛选值：频率 `high-frequency`、`intraday`、`daily`、`weekly-or-longer`、`unspecified`；策略大类、方法家族、方法的 id 见 `<kb>/VOCAB.md`（只在要用筛选、又不确定 id 时才读）。
 
 ## 步骤
 
-0. **策略笔记**：只在使用者明说要迭代、推进某个策略的开发时才用（例如「继续做 XX 策略」「把这个记进 XX 的笔记」）：先读 `/home/newt/quant-kb/workspace/<策略名>/notes.md`，笔记里「已读研报」有的不再重读那张卡，除非问题需要笔记没记的细节。只是问「有什么方法、有什么特征」这类查资料的问题，即使提到自己想做某个策略，也**不建、不读、不写**笔记；不确定时不写，回答末尾问一句要不要记进笔记。
+0. **策略笔记**：只在使用者明说要迭代、推进某个策略的开发时才用（例如「继续做 XX 策略」「把这个记进 XX 的笔记」）：先读 `<workspace>/<策略名>/notes.md`，笔记里「已读研报」有的不再重读那张卡，除非问题需要笔记没记的细节。只是问「有什么方法、有什么特征」这类查资料的问题，即使提到自己想做某个策略，也**不建、不读、不写**笔记；不确定时不写，回答末尾问一句要不要记进笔记。
 1. **搜索**：`kb-search search "<问题>"`，问到频率、资产、策略大类时加筛选。列表型问题用筛选＋`--all`，读清单就能答，不必读卡。一个问题最多换 2 种说法各搜一次。
 2. **看清单**：看完整张清单（不只前几名），按标题、一句摘要、命中的词挑出可能相关的。排名后面但摘要明显相关的也要挑。
 3. **读精简卡**：`kb-search brief <挑出的 id>`，最多 8 张。多数「有没有、谁做过、大概怎么做」的问题到这里就能答。
@@ -41,7 +43,7 @@ description: 查询量化研报知识库（券商研报的方法卡片与全文�
 
 ## 策略笔记
 
-位置 `/home/newt/quant-kb/workspace/<策略名>/notes.md`（不在 `kb/`，发布不会覆盖；属于使用者的研究资料，不进 git）。没有就建一份：
+位置 `<workspace>/<策略名>/notes.md`（不在 `kb/`，发布不会覆盖；属于使用者的研究资料，不进 git）。没有就建一份：
 
 ```markdown
 # <策略名> 开发笔记
@@ -70,7 +72,7 @@ description: 查询量化研报知识库（券商研报的方法卡片与全文�
 
 - 方法（因子构造、信号、检验流程）可以借；收益、IC、最优参数只代表原文的市场与区间。
 - 找出结论依赖的大陆市场条件：T+1、涨跌停、融券难、停牌与 ST、股指期货 2015 年后的限仓、散户占比、小市值与壳价值、指数成分股效应、股灾等特殊时期。精简卡有「市场条件」就以它为准；没有时从步骤、结果的条件判断，必要时 `kb-search grep <id> "涨跌停|停牌|T\+1|融券|做空|ST|股灾|限仓|散户|成分股"`。
-- 完整清单与各市场差异见 `kb/CLAUDE.md` 的「市场范围」。
+- 完整清单与各市场差异见 `<kb>/CLAUDE.md` 的「市场范围」。
 
 ## 可信度
 
@@ -91,8 +93,8 @@ description: 查询量化研报知识库（券商研报的方法卡片与全文�
 
 ## kb-search 不能用时
 
-例如 `~/venvs/kb-parse` 不在：退回旧做法——在 `kb/catalog.jsonl` grep 标签与 frequency、在 `kb/cards/` grep 简体关键词，候选卡先只读「## 摘要」到「## 方法步骤」之间（`sed -n '/^## 摘要/,/^## 方法步骤/p'`），并告诉使用者工具坏了、这次比较耗 token。
+例如找不到 `kb-search` 或它的 Python 环境：知识库在 `$(readlink -f <本 skill 的目录>)/../../../kb`（skill 目录是指向项目 `pipeline/skill/quant-kb` 的链接）。退回旧做法——在 `<kb>/catalog.jsonl` grep 标签与 frequency、在 `<kb>/cards/` grep 简体关键词，候选卡先只读「## 摘要」到「## 方法步骤」之间（`sed -n '/^## 摘要/,/^## 方法步骤/p'`），并告诉使用者工具坏了、这次比较耗 token。
 
 ## 更新
 
-知识库随 quant-kb 项目的发布更新（`publish.py publish <batch>`，会顺便更新 `kb/index/` 的向量索引）。这份 skill 的源文件在 `/home/newt/quant-kb/pipeline/skill/quant-kb/`，`~/.claude/skills/quant-kb` 是指向它的链接。
+知识库随 quant-kb 项目的发布更新（`publish.py publish <batch>`，会顺便更新 `kb/index/` 的向量索引）。这份 skill 的源文件在项目的 `pipeline/skill/quant-kb/`，`~/.claude/skills/quant-kb` 是指向它的链接。

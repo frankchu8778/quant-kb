@@ -89,7 +89,7 @@ flowchart TD
 
 ## 操作手冊：一批新研報從頭到尾
 
-所有指令在 `pipeline/` 下執行，Python 用 `/home/newt/venvs/kb-parse/bin/python`。花錢的步驟都要給 `--budget`，先用 `--dry-run` 看。
+所有指令在 `pipeline/` 下執行，Python 用 `~/venvs/kb-parse/bin/python`（或自己裝好依賴的環境；路徑設定見 README「路徑與環境設定」）。花錢的步驟都要給 `--budget`，先用 `--dry-run` 看。
 
 ```bash
 # 1. 選檔：從 .env 的 Research_Report_PATH 隨機選，只記原始路徑，不複製 PDF

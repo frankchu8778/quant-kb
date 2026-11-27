@@ -10,6 +10,7 @@ token 只花在讀進來的內容上，排序在本機做，所以每題的成�
   kb-search card <id>                  整張卡
   kb-search grep <id> "正则" [--max 2]  只在這一篇的全文裡找段落，最多 2 段、每段 ≤600 字
   kb-search index [--rebuild]          更新向量索引（publish.py publish 跑完會自動呼叫）
+  kb-search paths                      印出知識庫、VOCAB、策略筆記、原始碼、模型的實際路徑（skill 用它，不寫死路徑）
   kb-search serve | stop | status      常駐查詢服務（search 會自動啟動它，只用 CPU，閒置 15 分鐘自動關閉）
 id 可以只打最後 6 碼。問題用簡體或繁體都可以（工具會轉成簡體）。
 
@@ -40,6 +41,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 KB = Path(os.environ.get("KB_DIR", HERE.parent / "kb"))
 INDEX = KB / "index"
+WORKSPACE = Path(os.environ.get("KB_WORKSPACE", HERE.parent / "workspace"))   # 策略筆記
 MODEL = Path(os.environ.get("KB_EMBED_MODEL", Path.home() / "models" / "bge-m3"))
 HOST, PORT = "127.0.0.1", int(os.environ.get("KB_SEARCH_PORT", "8765"))
 IDLE = int(os.environ.get("KB_SEARCH_IDLE", "900"))      # 閒置幾秒後服務自動關閉
@@ -508,6 +510,13 @@ def cmd_status(args):
     print(f"索引：{json.loads((INDEX / 'meta.json').read_text())['built_at'] if st.exists() else '還沒建'}（{INDEX}）")
 
 
+def cmd_paths(args):
+    """skill 不寫死路徑：agent 先跑這個，知道知識庫、策略筆記與原始碼在哪。"""
+    for k, v in (("kb", KB), ("vocab", KB / "VOCAB.md"), ("kb_claude", KB / "CLAUDE.md"), ("workspace", WORKSPACE),
+                 ("index", INDEX), ("source", Path(__file__).resolve()), ("model", MODEL)):
+        print(f"{k}\t{v}")
+
+
 def cmd_stop(args):
     try:
         http("GET", "/stop", timeout=5)
@@ -540,7 +549,7 @@ def main():
     sp.add_argument("--max", type=int, default=2)
     sp = sub.add_parser("index")
     sp.add_argument("--rebuild", action="store_true")
-    for name in ("serve", "stop", "status"):
+    for name in ("serve", "stop", "status", "paths"):
         sub.add_parser(name)
     args = ap.parse_args()
     globals()[f"cmd_{args.cmd}"](args)

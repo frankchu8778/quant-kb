@@ -9,7 +9,7 @@
 # 中途被關掉也沒關係：重跑同一個指令即可，已收回、已檢查過的不會重複花錢。
 set -u
 cd "$(dirname "$0")"
-P=/home/newt/venvs/kb-parse/bin/python
+P=${KB_PYTHON:-$HOME/venvs/kb-parse/bin/python}   # 生產線用的 Python，可用 KB_PYTHON 改
 BATCH=$1
 BUDGET=$2
 POLL=${3:-600}

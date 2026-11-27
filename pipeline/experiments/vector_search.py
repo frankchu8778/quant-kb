@@ -22,7 +22,7 @@ HERE = Path(__file__).resolve().parent
 KB = HERE.parents[1] / "kb"
 CACHE = HERE / "_cache"
 OUT = HERE.parent / "results" / "vector_experiment.md"
-MODEL = Path.home() / "models" / "bge-m3"
+MODEL = Path(__import__("os").environ.get("KB_EMBED_MODEL", Path.home() / "models" / "bge-m3"))
 CHUNK, OVERLAP = 600, 100
 
 # 問題、關鍵詞正則（照 skill 步驟事先寫好，沒看向量結果）、額外的結構化條件、標準答案（卡片 id 尾碼）

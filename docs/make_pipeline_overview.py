@@ -140,5 +140,5 @@ defs = "".join(f'<marker id="a{c}" viewBox="0 0 10 10" refX="9" refY="5" markerW
 svg = (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" '
        f'font-family="\'Noto Sans CJK TC\',\'Noto Sans TC\',\'PingFang TC\',\'Microsoft JhengHei\',\'Heiti TC\',sans-serif">'
        f'<defs>{defs}</defs><rect width="{W}" height="{H}" fill="#ffffff"/>' + "".join(out) + "</svg>")
-open("/home/newt/quant-kb/docs/pipeline_overview.svg", "w").write(svg)
+open(__import__("pathlib").Path(__file__).with_name("pipeline_overview.svg"), "w").write(svg)
 print(len(svg))

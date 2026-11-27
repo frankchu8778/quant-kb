@@ -167,7 +167,30 @@ ln -s "$PWD/pipeline/bin/kb-search" ~/.local/bin/kb-search
 kb-search index                                                  # 第一次建索引
 ```
 
-skill 裡的路徑寫死為 `/home/newt/quant-kb`，放在別的位置要一起改。
+專案放在哪裡都可以：skill 不寫死路徑，agent 會先跑 `kb-search paths` 找到知識庫與策略筆記的位置。`~/.local/bin` 要在 PATH 上。
+
+### 路徑與環境設定
+
+這個專案原本只在作者的機器上跑，有些地方寫死了作者的路徑（`/home/newt/...`）或預設作者的環境配置。換一台機器時，寫死的絕對路徑會讓程式找不到執行檔或檔案（`No such file or directory`），skill 也會叫 agent 去讀不存在的位置。現在的處理：
+
+| 位置 | 原本 | 現在怎麼設定 |
+|---|---|---|
+| `pipeline/skill/quant-kb/SKILL.md` | 寫死 `/home/newt/quant-kb/kb/` 等路徑 | 不寫路徑，agent 跑 `kb-search paths` 取得；`kb-search` 不能用時，從 skill 目錄的連結回推專案位置 |
+| `pipeline/bin/kb-search` | `~/venvs/kb-parse/bin/python` | `KB_SEARCH_PYTHON`；沒設、也找不到預設環境時用 PATH 上的 `python3` |
+| `pipeline/kbsearch.py` | 知識庫與筆記在專案內、模型在 `~/models/bge-m3` | `KB_DIR`、`KB_WORKSPACE`、`KB_EMBED_MODEL`（預設不變） |
+| `pipeline/publish.py`（發布後更新索引） | `~/venvs/kb-parse/bin/python` | `KB_SEARCH_PYTHON`；找不到時只印提醒，發布照常完成 |
+| `pipeline/batch.py`（PDF 轉檔） | 寫死 `/home/newt/venvs/kb-parse/bin/mineru-kit` | `MINERU_BIN` > 和目前 Python 同一個環境的 `mineru-kit` > PATH 上的 `mineru-kit` |
+| `pipeline/watch.sh` | 寫死 `/home/newt/venvs/kb-parse/bin/python` | `KB_PYTHON`（預設 `~/venvs/kb-parse/bin/python`） |
+| `pipeline/serve_mineru_vlm.sh` | 作者機器的 vLLM 環境與 CUDA 12.9 修正 | `VLLM_VENV`、`MINERU_VLM_MODEL`；`ptxas`、`C_INCLUDE_PATH` 兩項是 RTX 5090 + 驅動 577 的相容設定，其他機器多半不需要，或直接改用 MinerU 的 basic 等級 |
+| `pipeline/experiments/vector_search.py` | `~/models/bge-m3` | `KB_EMBED_MODEL` |
+| `docs/make_pipeline_overview.py` | 寫死輸出到 `/home/newt/quant-kb/docs/` | 輸出到腳本所在的資料夾 |
+| 研報 PDF 所在資料夾 | — | `.env` 的 `Research_Report_PATH`（原本就是設定值） |
+
+還留著的：
+
+- `lab/` 是 POC 與實驗封存，裡面的腳本與文件保留作者機器的路徑（`~/venvs/kb-llm-cu129`、`$HOME/quant-kb/...`），正式流程不用它們。
+- 文件裡的指令以 `~/venvs/kb-parse/bin/python` 為例；用自己的環境時換成對應的 Python 即可。
+- 模型、venv 的預設位置（`~/models/bge-m3`、`~/venvs/kb-parse`）是作者的習慣，不是必要條件，用上面的環境變數指到自己的位置。
 
 ## 開發過程
 

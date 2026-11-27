@@ -42,7 +42,9 @@ from common import KB
 
 ROOT = Path(os.environ.get("QUANT_KB_ROOT", KB))
 MANIFEST = ROOT / "catalog" / "manifest.json"
-MINERU = "/home/newt/venvs/kb-parse/bin/mineru-kit"
+# MinerU 的執行檔：MINERU_BIN 環境變數 > 和目前 Python 同一個 venv 的 mineru-kit > PATH 上的 mineru-kit
+MINERU = (os.environ.get("MINERU_BIN") or next((str(p) for p in [Path(sys.executable).parent / "mineru-kit"] if p.exists()), None)
+          or "mineru-kit")
 IMG_RE = re.compile(r"!\[([^\]]*)\]\(data:image/([a-z]+);base64,([^)]*)\)")
 # MinerU 有時把圖放在 HTML 表格裡，寫成 <img src="data:image/...;base64,...">（sub1 另類交易策略系列之十一：
 # 95 萬字裡 93 萬字是這種圖片編碼，2026-11-24 發現），也要抽成檔案
