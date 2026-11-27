@@ -19,13 +19,14 @@
 
 | 指標 | 數字 |
 |---|---|
-| 知識庫 | 121 張卡片，每張附研報全文 |
+| 知識庫 | 181 張卡片，每張附研報全文 |
 | 程式檢查第一次通過率 | 88%（85/97） |
 | 檢查員退回、重寫後通過 | 2/97 |
 | 需要人工升級處理 | 0 |
 | 埋雷抓到率 | 9/9（檢查員對已知錯誤的偵測率） |
 | 每張通過的卡 | 約 ¥1.33（含寫卡、檢查、重寫、審計） |
 | 引文竄改偵測 | 改一個數字 729/729、刪「不」字 126/126 全部擋下 |
+| 查詢：每題讀進的字數 | 約 9,400 字（舊做法約 14.5 萬字），召回 94%（舊 88%） |
 
 ## 架構
 
@@ -47,7 +48,8 @@ flowchart LR
     G -. critical/major .-> K[人工複核表]
     J -. 不一致 .-> K
     K --> H
-    H --> L[AI agent 查詢<br/>Claude Code Skill]
+    H --> S[kb-search<br/>本機混合排序]
+    S --> L[AI agent 查詢<br/>Claude Code Skill]
 ```
 
 ## 設計重點
@@ -112,12 +114,68 @@ flowchart LR
 - 知識庫附 agent 用的說明（`kb/CLAUDE.md`）與 Claude Code Skill：標籤對照、檢索步驟、可信度規則、回答格式（每個結論標來源卡片 id）。
 - **市場範圍**：研報都來自中國大陸市場，若要套用到台股、CME 期貨等其他市場，agent 被要求把「方法」與「結論數字」分開，逐條列出結論依賴的大陸市場條件（T+1、漲跌停、融券限制、散戶結構等），並標註「未在目標市場驗證」。新卡片另有附引文的「市場條件」欄位，只記原文事實，不讓模型推測可遷移性。
 
+### 8. 查詢：本機排序、分層讀取，篇數變多也不多花 token
+
+舊做法是 agent 自己 grep 卡片、候選卡整張讀。一張卡約 7,000 字，一題常要讀 20 張，約 14 萬字；篇數越多候選越多，成本線性上升。現在改成：
+
+- **排序在本機做，不花 token**：`kb-search` 把三種訊號用 RRF（倒數名次）合併排序——語意（bge-m3 向量，比對卡片的標題＋摘要＋核心思路，可以用模糊的說法找到換了用詞的研報）、關鍵詞（中文雙字組 BM25）、標籤（問題裡出現的方法、策略大類名稱與別名）。可用頻率、策略大類、資產、方法家族、日期篩選。
+- **agent 分層讀，夠了就停**：清單（一行約 100 字）→ 精簡卡（從整卡自動組，約 1,000 字，不另花寫卡費用）→ 整卡（具體問題才讀，每題最多 3 張）→ 原文段落（只在卡片缺數字或前後矛盾時，單篇最多 2 段）。一般問題約 1 萬字，深入約 3 萬字，超過先問使用者。
+- **成本固定**：agent 永遠只讀排名前面的，所以每題成本不隨庫的大小增加。
+- **驗收**（10 題）：清單召回 94%（舊 88%），清單＋前 8 張精簡卡 86%，讀進約 9,400 字，約少 15 倍。題目與標準答案由 Claude 定，數字偏樂觀。
+- 先做過小實驗比較單用向量與關鍵詞：單用向量召回 77–80%，比關鍵詞（88%）差；兩者混合 97%。所以採用混合排序，不只用向量。全文段落向量的效果和卡片向量差不多，沒有採用。
+
+## 查詢知識庫
+
+### 在 Claude Code 裡問
+
+`quant-kb` skill 的源檔在 `pipeline/skill/quant-kb/SKILL.md`，裝在使用者層級（`~/.claude/skills/quant-kb` 是指向它的連結），所以這台機器上任何專案的 Claude Code 都能用：
+
+- **自動觸發**：問題像是在查研報、找方法、要參數或回測數字時，Claude 會自己載入。是模型判斷，不保證每次都觸發。
+- **手動呼叫**：訊息開頭打 `/quant-kb`，例如 `/quant-kb 有沒有用訂單簿不平衡做日內擇時的研報`，一定會走知識庫流程。
+- 回答會標每個結論的來源卡片 id、附原文檔名（照抄，方便在自己的資料夾搜原文），最後一行寫這次讀了哪幾層。
+- **策略筆記**：只有明說要迭代某個策略時（「繼續做 XX 策略」），agent 才會在 `workspace/<策略名>/notes.md` 記下讀過的研報重點，之後先讀筆記、不重讀卡片。筆記不進 git。
+
+### 直接用命令列（不經過 Claude，不花 token）
+
+```bash
+kb-search search "日內突破 假突破過濾"                  # 排序清單，前 15 名
+kb-search search "日內策略" --freq intraday --all     # 列出所有符合篩選的
+kb-search search "動量改進" --type multi-factor --since 2018 --brief 3
+kb-search brief 1934bc 69f67d                         # 精簡卡（id 可只打最後 6 碼）
+kb-search card 1934bc                                 # 整張卡
+kb-search grep 1934bc "成交量|放量"                    # 只在這一篇的全文找段落
+kb-search status | stop | index                       # 服務狀態、關閉服務、更新索引
+```
+
+問題用簡體或繁體都可以。篩選值：頻率 `high-frequency`、`intraday`、`daily`、`weekly-or-longer`、`unspecified`；策略大類與方法 id 見 `kb/VOCAB.md`。
+
+### 查詢服務
+
+- 只有 `search` 需要模型。第一次 `search` 會自動在背景啟動本機服務，約 15 秒；之後每次查詢不到 1 秒。`brief`、`card`、`grep` 直接讀檔，不用服務。
+- 服務只聽 `127.0.0.1:8765`、只用 CPU（4 執行緒，約 2–3 GB 記憶體，不佔 GPU），**閒置 15 分鐘自動關閉**。日誌在 `pipeline/logs/kbsearch.log`。
+- 向量索引在 `kb/index/`（numpy，3,000 篇約 6 MB）。`publish.py publish` 跑完會自動增量更新，服務看到索引變了會自己重載。要換成向量資料庫，只改 `pipeline/kbsearch.py` 的 `VectorStore`。
+- 以後換別台機器當資料庫，把服務改成對外監聽，就是給其他機器用的 REST API（目前沒做）。
+- 可調的環境變數：`KB_SEARCH_PORT`、`KB_SEARCH_IDLE`（秒）、`KB_EMBED_MODEL`（模型路徑）、`KB_DIR`（知識庫路徑）、`KB_SEARCH_PYTHON`（`kb-search` 與發布時用的 Python）。
+
+### 在新機器上安裝
+
+需要：知識庫 `kb/`（由發布產生）、一個裝了 `sentence-transformers`、`torch`、`numpy`、`pyyaml`、`opencc-python-reimplemented` 的 Python 環境（預設 `~/venvs/kb-parse`），以及 bge-m3 模型（預設 `~/models/bge-m3`）。
+
+```bash
+ln -s "$PWD/pipeline/skill/quant-kb" ~/.claude/skills/quant-kb   # 在專案根目錄執行
+ln -s "$PWD/pipeline/bin/kb-search" ~/.local/bin/kb-search
+kb-search index                                                  # 第一次建索引
+```
+
+skill 裡的路徑寫死為 `/home/newt/quant-kb`，放在別的位置要一起改。
+
 ## 開發過程
 
 1. **POC（20 篇）**：比較 PDF 轉檔工具（MinerU basic / standard）、寫卡模型（Sonnet、MiniMax、本地 Qwen 經 vLLM），以及 agent 檢索的命中率（10/10）。本地模型因編造數字與方法標籤涵蓋率不足而不採用。
 2. **試產**：設計卡片 schema v4（每個方法步驟附引文與章節）、檢查員流程、多組評審模型交叉比對、檢查員判定穩定度實驗。
 3. **量產**：batch API、自動監控、埋雷與審計、人工複核回寫、發布。
-4. 實驗過程完整封存在 `lab/`，正式流程不依賴它。
+4. **查詢優化**：向量與關鍵詞的小實驗（`pipeline/experiments/vector_search.py`），再做成 `kb-search` 與分層讀取的 skill，驗收見 `pipeline/results/kbsearch_eval.md`。
+5. 實驗過程完整封存在 `lab/`，正式流程不依賴它。
 
 ## 技術
 
@@ -125,16 +183,18 @@ flowchart LR
 - **LLM API**：Kimi（batch）、DeepSeek、MiniMax；結構化輸出、離峰排程、餘額與預算控管
 - **文件處理**：MinerU（本機 GPU，VLM 模式）PDF → Markdown，表格保留為 HTML
 - **Agent 整合**：Claude Code Skill、給 agent 的檢索說明
+- **檢索**：bge-m3 向量（sentence-transformers）、中文雙字組 BM25、RRF 混合排序、OpenCC 繁簡轉換、標準函式庫 HTTP 常駐服務
 - **維運**：Bash 背景監控 batch、manifest 狀態機、檔案鎖合併寫入
 
 ## 目錄
 
 | 位置 | 內容 |
 |---|---|
-| `pipeline/` | 全部程式、prompt、詞彙表、查詢 Skill |
+| `pipeline/` | 全部程式、prompt、詞彙表、查詢 Skill（`skill/quant-kb/`）與查詢工具（`kbsearch.py`、`bin/kb-search`） |
 | `docs/PIPELINE.md` | 正式流程的完整紀錄：操作手冊、狀態定義、防呆機制、已知缺口 |
 | `PLAN.md`、`TODO.md` | 設計理由與待辦 |
-| `kb/` | 成品知識庫（發布產生，不進 git） |
+| `kb/` | 成品知識庫與查詢索引 `kb/index/`（發布產生，不進 git） |
+| `workspace/` | 策略筆記（agent 寫的研究資料，不進 git） |
 | `lab/` | POC 與實驗封存 |
 
 研報 PDF、全文、卡片與帳本屬於資料，不放進版本控制。
